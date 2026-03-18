@@ -82,18 +82,28 @@ chmod 750 data data/sessions data/updates data/uploads
 
 ## Schritt 3 — Konfiguration
 
-`config.php` öffnen und folgende Werte anpassen:
+Eigene Werte **nicht** direkt in `config.php` eintragen (die Datei wird bei Updates überschrieben).
+Stattdessen eine neue Datei `config.local.php` anlegen — sie wird automatisch geladen und ist gitignored:
+
+```bash
+cp config.php config.local.php   # als Startpunkt, dann anpassen
+```
+
+Mindest-Inhalt von `config.local.php`:
 
 ```php
-const TELEGRAM_BOT_TOKEN  = '123456789:AAF...';    // aus Schritt 1.1
-const TELEGRAM_CHAT_ID    = -1001234567890;          // aus Schritt 1.3
-const BOT_USER_ID         = 987654321;               // aus Schritt 1.4
+<?php
+define('TELEGRAM_BOT_TOKEN',  '123456789:AAF...');   // aus Schritt 1.1
+define('TELEGRAM_CHAT_ID',    -1001234567890);         // aus Schritt 1.3
+define('BOT_USER_ID',         987654321);              // aus Schritt 1.4
 
-const COMPANY_NAME        = 'Mein Unternehmen';
-const WELCOME_MESSAGE     = 'Hallo! 👋 Wie können wir helfen?';
+define('COMPANY_NAME',    'Mein Unternehmen');
+define('WELCOME_MESSAGE', 'Hallo! 👋 Wie können wir helfen?');
 
-// Verfügbarkeitszeiten (Zeitzone anpassen!)
-const AVAILABILITY_SCHEDULE = [
+define('OFFLINE_NOTIFY_EMAIL', 'support@yoursite.com');
+define('ALLOWED_ORIGINS',      ['https://yoursite.com']);
+
+define('AVAILABILITY_SCHEDULE', [
     'timezone' => 'Europe/Berlin',
     'hours' => [
         'mon' => ['09:00', '18:00'],
@@ -105,15 +115,10 @@ const AVAILABILITY_SCHEDULE = [
         'sun' => null,
     ],
     'offline_message' => 'Wir sind gerade nicht erreichbar. Hinterlasse eine Nachricht!',
-];
-
-// E-Mail wenn Nutzer offline ist (leer lassen zum Deaktivieren)
-const OFFLINE_NOTIFY_EMAIL = 'support@yoursite.com';
-const OFFLINE_NOTIFY_AFTER = 5 * 60;   // 5 Minuten
-
-// CORS: eigene Domain eintragen
-const ALLOWED_ORIGINS = ['https://yoursite.com'];
+]);
 ```
+
+Alles was nicht in `config.local.php` definiert wird, fällt auf die Standardwerte in `config.php` zurück.
 
 ---
 
@@ -160,10 +165,10 @@ php -r "echo bin2hex(random_bytes(16));"
 # Beispiel-Output: a3f7b2c1d4e5f6a7b8c9d0e1f2a3b4c5
 ```
 
-In `config.php` eintragen:
+In `config.local.php` eintragen:
 ```php
-const TELEGRAM_WEBHOOK_URL    = 'https://yoursite.com/support-chat/webhook.php';
-const TELEGRAM_WEBHOOK_SECRET = 'a3f7b2c1d4e5f6a7b8c9d0e1f2a3b4c5';
+define('TELEGRAM_WEBHOOK_URL',    'https://yoursite.com/support-chat/webhook.php');
+define('TELEGRAM_WEBHOOK_SECRET', 'a3f7b2c1d4e5f6a7b8c9d0e1f2a3b4c5');
 ```
 
 ### 5.2 Webhook registrieren
