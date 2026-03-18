@@ -176,6 +176,7 @@
   flex-shrink: 0;
 }
 #sc-status-dot.sc-online { background: #4ade80; }
+#sc-resolve-btn,
 #sc-notif-btn {
   width: 30px;
   height: 30px;
@@ -190,7 +191,9 @@
   transition: background .15s;
   flex-shrink: 0;
 }
+#sc-resolve-btn:hover,
 #sc-notif-btn:hover { background: rgba(255,255,255,.25); }
+#sc-resolve-btn svg,
 #sc-notif-btn svg   { width: 16px; height: 16px; }
 #sc-notif-btn.sc-active { background: rgba(255,255,255,.3); }
 

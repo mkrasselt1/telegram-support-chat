@@ -459,6 +459,7 @@
       // Render history
       if (data.history && data.history.length > 0) {
         for (const msg of data.history) renderMessage(msg, false);
+        lastMsgId = data.history[data.history.length - 1].id;
         scrollToBottom(false);
       }
 
