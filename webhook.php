@@ -62,7 +62,6 @@ echo 'ok';
 // =============================================================================
 
 // Commands an agent can type in the Telegram thread to close the session
-define('CLOSE_COMMANDS', ['/close', '/resolved', '/done', '/closed']);
 
 function debugLog(string $msg): void
 {
@@ -114,7 +113,7 @@ function processUpdate(array $update): void
         . ' | dir writable: ' . (is_writable(SESSION_DIR) ? 'yes' : 'NO'));
 
     debugLog('checking close command: ' . $command);
-    if (in_array($command, CLOSE_COMMANDS, true)) {
+    if (in_array($command, ['/close', '/resolved', '/done', '/closed'], true)) {
         closeSession($sessionId, 'agent', $bot);
         return;
     }
