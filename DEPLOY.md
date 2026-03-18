@@ -1,5 +1,30 @@
 # Deployment-Anleitung — Telegram Support Chat
 
+## Features
+
+| Feature | Beschreibung |
+|---|---|
+| **Echtzeit-Chat** | Nachrichten via Webhook sofort, Fallback auf Polling (4s) |
+| **Telegram-Integration** | Jede Chat-Session wird als eigener Topic-Thread in einer Supergroup angelegt |
+| **Bot-Befehle** | `/online`, `/offline`, `/close`, `/resolved`, `/done` direkt aus Telegram |
+| **Datei-Upload** | Bilder, PDFs, Audio, Video (konfigurierbare Maximalgröße) |
+| **Sprachnachrichten** | Direktaufnahme im Browser, als Audio-Datei an Telegram gesendet |
+| **Standort teilen** | GPS-Koordinaten als Telegram-Location-Nachricht |
+| **Screenshot** | Browser-Screen-Capture direkt im Widget |
+| **Nachrichten-Entwurf** | Unfertige Nachrichten werden per localStorage gespeichert und nach Seiten-Reload wiederhergestellt |
+| **Chat-Persistenz** | Session-ID, Offen/Geschlossen-Zustand und letzte Nachricht werden seitenübergreifend per localStorage gespeichert |
+| **E-Mail-Verlauf** | Nach Gesprächsende kann der User einen Transkript-Link an seine E-Mail schicken lassen |
+| **Verfügbarkeitsanzeige** | Konfigurierbare Zeiten pro Wochentag, Offline-Banner automatisch |
+| **Push-Benachrichtigungen** | Optional via Service Worker, auch wenn Widget geschlossen ist |
+| **Mehrsprachig** | `de` und `en` eingebaut, einfach erweiterbar |
+| **Theming** | Primärfarbe und Border-Radius per Config anpassbar |
+| **Mobile-optimiert** | Vollbild-Modus mit eigenem Zurück-Button auf kleinen Screens |
+| **Rate-Limiting** | Konfigurierbar per IP, schützt vor Spam |
+| **Webhook-Secret** | Telegram-Anfragen werden via `X-Telegram-Bot-Api-Secret-Token` validiert |
+| **Bearbeitete Nachrichten** | Wenn der Agent eine Telegram-Nachricht bearbeitet, wird sie im Widget aktualisiert |
+
+---
+
 ## Voraussetzungen
 
 | Anforderung | Minimum | Empfohlen |

@@ -413,7 +413,15 @@
     } else {
       startPolling();
     }
-    $('sc-text-input').focus();
+    // Restore unsent draft
+    const draft = localStorage.getItem('sc_draft');
+    const input = $('sc-text-input');
+    if (draft && !input.value) {
+      input.value = draft;
+      autoGrowTextarea(input);
+      $('sc-send-btn').disabled = false;
+    }
+    input.focus();
   }
 
   function closeChat() {
@@ -615,6 +623,7 @@
     }
 
     input.value = '';
+    localStorage.removeItem('sc_draft');
     autoGrowTextarea(input);
     $('sc-send-btn').disabled = true;
 
@@ -925,6 +934,12 @@
     const input = $('sc-text-input');
     autoGrowTextarea(input);
     $('sc-send-btn').disabled = !input.value.trim() && !pendingFile;
+    // Persist draft across page navigations
+    if (input.value.trim()) {
+      localStorage.setItem('sc_draft', input.value);
+    } else {
+      localStorage.removeItem('sc_draft');
+    }
   }
 
   function autoGrowTextarea(el) {
