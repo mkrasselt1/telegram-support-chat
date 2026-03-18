@@ -68,21 +68,30 @@ processUpdate($update);
 // Commands an agent can type in the Telegram thread to close the session
 const CLOSE_COMMANDS = ['/close', '/resolved', '/done', '/closed'];
 
+function debugLog(string $msg): void
+{
+    $logFile = DATA_DIR . '/webhook_debug.log';
+    $line    = '[' . date('Y-m-d H:i:s') . '] ' . $msg . "\n";
+    file_put_contents($logFile, $line, FILE_APPEND | LOCK_EX);
+}
+
 function processUpdate(array $update): void
 {
     $isEdit = isset($update['edited_message']) && !isset($update['message']);
     $msg    = $update['message'] ?? $update['edited_message'] ?? null;
-    if (!$msg) return;
+    if (!$msg) { debugLog('no message in update: ' . json_encode($update)); return; }
 
     // Ignore bots
-    if ($msg['from']['is_bot'] ?? false) return;
-    if (BOT_USER_ID !== 0 && (int)($msg['from']['id'] ?? 0) === BOT_USER_ID) return;
+    if ($msg['from']['is_bot'] ?? false) { debugLog('ignored bot message'); return; }
+    if (BOT_USER_ID !== 0 && (int)($msg['from']['id'] ?? 0) === BOT_USER_ID) { debugLog('ignored own bot message'); return; }
 
     $threadId  = $msg['message_thread_id'] ?? null;
     $agentName = trim(($msg['from']['first_name'] ?? '') . ' ' . ($msg['from']['last_name'] ?? '')) ?: COMPANY_NAME;
     $text      = trim($msg['text'] ?? '');
     $command   = strtolower(preg_replace('/@\S+$/', '', $text));
     $bot       = new TelegramBot(TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID);
+
+    debugLog("update received — thread={$threadId} from={$agentName} text={$text}");
 
     // /online and /offline are group-wide — work even in the General topic
     // where message_thread_id is absent.
@@ -100,6 +109,7 @@ function processUpdate(array $update): void
     if ($threadId === null) return;  // all other commands require a thread
 
     $sessionId = lookupSession((int) $threadId);
+    debugLog("lookupSession({$threadId}) → " . ($sessionId ?? 'null'));
     if (!$sessionId) return;  // update is for a thread we don't manage
 
     if (in_array($command, CLOSE_COMMANDS, true)) {
