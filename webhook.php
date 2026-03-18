@@ -46,7 +46,11 @@ foreach ([DATA_DIR, SESSION_DIR, UPLOAD_DIR, UPDATES_DIR] as $dir) {
 }
 
 // --- Process the update ---
-processUpdate($update);
+try {
+    processUpdate($update);
+} catch (Throwable $e) {
+    debugLog('FATAL: ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());
+}
 
 // Respond 200 after processing — Telegram retries on non-2xx
 http_response_code(200);
@@ -104,6 +108,12 @@ function processUpdate(array $update): void
     debugLog("lookupSession({$threadId}) → " . ($sessionId ?? 'null'));
     if (!$sessionId) return;  // update is for a thread we don't manage
 
+    $sessionFile = SESSION_DIR . '/' . $sessionId . '.json';
+    debugLog('session file exists: ' . (file_exists($sessionFile) ? 'yes' : 'NO')
+        . ' | writable: ' . (is_writable($sessionFile) ? 'yes' : 'NO')
+        . ' | dir writable: ' . (is_writable(SESSION_DIR) ? 'yes' : 'NO'));
+
+    debugLog('checking close command: ' . $command);
     if (in_array($command, CLOSE_COMMANDS, true)) {
         closeSession($sessionId, 'agent', $bot);
         return;
