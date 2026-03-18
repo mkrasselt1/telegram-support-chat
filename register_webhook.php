@@ -13,6 +13,8 @@ require_once __DIR__ . '/config.php';
 
 $action = $argv[1] ?? ($_GET['action'] ?? null);
 $url    = $argv[2] ?? ($_GET['url']    ?? '');
+$token  = TELEGRAM_BOT_TOKEN;
+$secret = TELEGRAM_WEBHOOK_SECRET;
 
 // No action given: auto-set if URL is configured, otherwise show info
 if ($action === null) {
@@ -24,8 +26,6 @@ if ($action === null) {
         }
     }
 }
-$token  = TELEGRAM_BOT_TOKEN;
-$secret = TELEGRAM_WEBHOOK_SECRET;
 
 function tgCall(string $token, string $method, array $params = []): array
 {
