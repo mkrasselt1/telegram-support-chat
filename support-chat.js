@@ -177,6 +177,11 @@
     applyTheme();
     attachEvents();
 
+    // Restore open state from previous page
+    if (localStorage.getItem('sc_window_open') === '1') {
+      openChat();
+    }
+
     // Register service worker
     if ('serviceWorker' in navigator && config.swPath) {
       navigator.serviceWorker.register(config.swPath, { scope: '/' })
@@ -373,6 +378,7 @@
 
   function openChat() {
     isOpen = true;
+    localStorage.setItem('sc_window_open', '1');
     $('sc-launcher').classList.add('sc-open');
     $('sc-window').classList.add('sc-open');
     clearUnread();
@@ -387,6 +393,7 @@
 
   function closeChat() {
     isOpen = false;
+    localStorage.removeItem('sc_window_open');
     $('sc-launcher').classList.remove('sc-open');
     $('sc-window').classList.remove('sc-open');
     stopPolling();
