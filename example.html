@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Support Chat — Integration Example</title>
+  <style>
+    body { font-family: sans-serif; max-width: 800px; margin: 80px auto; padding: 0 20px; color: #333; }
+    h1 { color: #0088cc; }
+    pre { background: #f3f4f6; padding: 16px; border-radius: 8px; overflow-x: auto; font-size: 13px; }
+    code { font-family: 'Fira Code', monospace; }
+  </style>
+</head>
+<body>
+
+<h1>Telegram Support Chat — Demo</h1>
+<p>The chat button should appear in the bottom-right corner of this page.</p>
+<p>This is the minimal integration example. Scroll down for the full integration snippet.</p>
+
+<h2>Integration snippet</h2>
+<pre><code>&lt;!-- Place before &lt;/body&gt; --&gt;
+&lt;script&gt;
+window.SupportChatConfig = {
+  // Required: URL to your chat.php endpoint
+  endpoint: '/support-chat/chat.php',
+
+  // Optional: path to service worker (must be at or above widget scope)
+  swPath: '/sw.js',
+
+  // Optional: path to CSS (auto-detected from script src if omitted)
+  cssPath: '/support-chat/support-chat.css',
+
+  // Optional: logged-in user info (sent to Telegram as context)
+  user: {
+    name:  'Jane Doe',
+    email: 'jane@example.com',
+    id:    '42',
+  },
+
+  // Optional: polling interval in ms (default: 4000)
+  pollInterval: 4000,
+
+  // Optional: theme overrides
+  theme: {
+    primary: '#0088cc',   // Your brand color
+    radius:  '16px',
+  },
+};
+&lt;/script&gt;
+&lt;script src="/support-chat/support-chat.js" async&gt;&lt;/script&gt;
+</code></pre>
+
+<!-- ========== INTEGRATION START ========== -->
+<script>
+window.SupportChatConfig = {
+  endpoint:     'chat.php',       // adjust to your deployment path
+  swPath:       'sw.js',
+  pollInterval: 4000,
+  user: null,   // set to { name, email, id } for logged-in users
+  theme: {
+    primary: '#0088cc',
+  },
+};
+</script>
+<script src="support-chat.js" async></script>
+<!-- ========== INTEGRATION END ========== -->
+
+</body>
+</html>
