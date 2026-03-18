@@ -40,19 +40,6 @@ if (!is_array($update) || !isset($update['update_id'])) {
     exit;
 }
 
-// Always respond 200 immediately — Telegram retries on non-2xx
-http_response_code(200);
-header('Content-Type: text/plain');
-echo 'ok';
-
-// Flush response to Telegram before doing any work
-if (function_exists('fastcgi_finish_request')) {
-    fastcgi_finish_request();
-} else {
-    ob_end_flush();
-    flush();
-}
-
 // --- Ensure data directories exist ---
 foreach ([DATA_DIR, SESSION_DIR, UPLOAD_DIR, UPDATES_DIR] as $dir) {
     if (!is_dir($dir)) mkdir($dir, 0750, true);
@@ -60,6 +47,11 @@ foreach ([DATA_DIR, SESSION_DIR, UPLOAD_DIR, UPDATES_DIR] as $dir) {
 
 // --- Process the update ---
 processUpdate($update);
+
+// Respond 200 after processing — Telegram retries on non-2xx
+http_response_code(200);
+header('Content-Type: text/plain');
+echo 'ok';
 
 // =============================================================================
 // Processing
