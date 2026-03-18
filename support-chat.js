@@ -47,6 +47,12 @@
       screenshotTitle:       'Share screenshot',
       screenshotAriaLabel:   'Share screenshot',
       imagePreviewAriaLabel: 'Image preview',
+      closeChat:             'Close chat',
+      transcriptTitle:       'Email transcript',
+      transcriptPlaceholder: 'your@email.com',
+      transcriptSend:        'Send transcript',
+      transcriptSent:        'Transcript sent to your inbox!',
+      transcriptErr:         'Could not send transcript. Please try again.',
       resolvedTitle:         'Chat resolved',
       resolvedSub:           'This conversation has been marked as resolved.',
       restartBtn:            'Start new chat',
@@ -100,6 +106,12 @@
       screenshotTitle:       'Screenshot teilen',
       screenshotAriaLabel:   'Screenshot teilen',
       imagePreviewAriaLabel: 'Bildvorschau',
+      closeChat:             'Chat schließen',
+      transcriptTitle:       'Verlauf per E-Mail',
+      transcriptPlaceholder: 'deine@email.de',
+      transcriptSend:        'Verlauf senden',
+      transcriptSent:        'Verlauf wurde an deine E-Mail gesendet!',
+      transcriptErr:         'Verlauf konnte nicht gesendet werden. Bitte erneut versuchen.',
       resolvedTitle:         'Chat beendet',
       resolvedSub:           'Dieses Gespräch wurde als gelöst markiert.',
       restartBtn:            'Neuen Chat starten',
@@ -235,6 +247,9 @@
 
 <div id="sc-window" role="dialog" aria-label="${t('windowAriaLabel')}" aria-modal="false">
   <div id="sc-header">
+    <button id="sc-close-btn" title="${t('closeChat')}" aria-label="${t('closeChat')}">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+    </button>
     <div id="sc-avatar"></div>
     <div id="sc-header-info">
       <div id="sc-company-name">Support</div>
@@ -251,6 +266,14 @@
     <div class="sc-resolved-icon">✅</div>
     <div class="sc-resolved-title">${t('resolvedTitle')}</div>
     <div class="sc-resolved-sub" id="sc-resolved-sub">${t('resolvedSub')}</div>
+    <div id="sc-transcript-form">
+      <div class="sc-transcript-label">${t('transcriptTitle')}</div>
+      <div class="sc-transcript-row">
+        <input type="email" id="sc-transcript-email" placeholder="${t('transcriptPlaceholder')}" />
+        <button id="sc-transcript-send">${t('transcriptSend')}</button>
+      </div>
+      <div id="sc-transcript-feedback"></div>
+    </div>
     <button id="sc-restart-btn">${t('restartBtn')}</button>
   </div>
   <div id="sc-offline-banner">${t('offlineBanner')}</div>
@@ -337,6 +360,7 @@
   // --------------------------------------------------------------------------
   function attachEvents() {
     $('sc-launcher').addEventListener('click', toggleChat);
+    $('sc-close-btn').addEventListener('click', closeChat);
     $('sc-send-btn').addEventListener('click', sendText);
     $('sc-notif-btn').addEventListener('click', toggleNotifications);
     $('sc-emoji-toggle').addEventListener('click', toggleEmojiPicker);
@@ -351,6 +375,7 @@
     $('sc-lightbox').addEventListener('click', closeLightbox);
     $('sc-resolve-btn').addEventListener('click', resolveChat);
     $('sc-restart-btn').addEventListener('click', restartChat);
+    $('sc-transcript-send').addEventListener('click', sendTranscript);
 
     const textInput = $('sc-text-input');
     textInput.addEventListener('input', onTextInput);
@@ -415,9 +440,31 @@
     stopPolling();   // authoritative stop — called from every close path
     const sub = $('sc-resolved-sub');
     sub.textContent = initiator === 'user' ? t('resolvedByUser') : t('resolvedByAgent');
+    // Prefill email from config if available
+    const emailInput = $('sc-transcript-email');
+    if (emailInput && config.user && config.user.email) {
+      emailInput.value = config.user.email;
+    }
+    $('sc-transcript-feedback').textContent = '';
     $('sc-resolved-overlay').classList.add('sc-visible');
     $('sc-input-area').style.display  = 'none';
     $('sc-resolve-btn').style.display = 'none';
+  }
+
+  async function sendTranscript() {
+    const email = $('sc-transcript-email').value.trim();
+    const feedback = $('sc-transcript-feedback');
+    if (!email || !sessionId) return;
+    $('sc-transcript-send').disabled = true;
+    try {
+      await api('transcript', { session_id: sessionId, email });
+      feedback.textContent = t('transcriptSent');
+      feedback.className = 'sc-transcript-ok';
+    } catch {
+      feedback.textContent = t('transcriptErr');
+      feedback.className = 'sc-transcript-err';
+      $('sc-transcript-send').disabled = false;
+    }
   }
 
   function restartChat() {

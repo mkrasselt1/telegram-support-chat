@@ -31,8 +31,9 @@ switch ($action) {
     case 'poll':   actionPoll();   break;
     case 'upload': actionUpload(); break;
     case 'file':   actionFile();   break;
-    case 'close':  actionClose();  break;
-    default:       jsonError('Unknown action', 400);
+    case 'close':      actionClose();      break;
+    case 'transcript': actionTranscript(); break;
+    default:           jsonError('Unknown action', 400);
 }
 
 // =============================================================================
@@ -203,6 +204,52 @@ function actionClose(): void
     }
 
     closeSession($sessionId, $initiator, makeTelegramBot());
+    jsonOk([]);
+}
+
+function actionTranscript(): void
+{
+    $body      = jsonBody();
+    $sessionId = sanitizeSessionId($body['session_id'] ?? '');
+    $email     = filter_var(trim($body['email'] ?? ''), FILTER_VALIDATE_EMAIL);
+
+    if (!$sessionId || !sessionExists($sessionId)) {
+        jsonError('Invalid session', 400);
+    }
+    if (!$email) {
+        jsonError('Invalid email address', 400);
+    }
+
+    $session = loadSession($sessionId);
+    $history = $session['history'] ?? [];
+
+    // Build plain-text transcript
+    $lines = ['Chat Transcript', str_repeat('-', 40), ''];
+    foreach ($history as $msg) {
+        $from = $msg['from'] ?? 'unknown';
+        $ts   = isset($msg['timestamp']) ? date('Y-m-d H:i', $msg['timestamp']) : '';
+        $who  = $from === 'agent' ? ($msg['agent_name'] ?? 'Support') : 'You';
+        $text = '';
+        switch ($msg['type'] ?? 'text') {
+            case 'text':     $text = $msg['content'] ?? '';            break;
+            case 'image':    $text = '[Image]';                        break;
+            case 'file':     $text = '[File: ' . ($msg['file_name'] ?? '') . ']'; break;
+            case 'audio':    $text = '[Voice message]';                break;
+            case 'location': $text = '[Location shared]';              break;
+            default:         $text = '[' . ($msg['type'] ?? '') . ']'; break;
+        }
+        if ($from === 'system') continue;
+        $lines[] = "[{$ts}] {$who}: {$text}";
+    }
+    $body = implode("\n", $lines);
+
+    $subject = defined('COMPANY_NAME') ? 'Your chat transcript — ' . COMPANY_NAME : 'Your chat transcript';
+    $headers = 'From: ' . (defined('COMPANY_NAME') ? COMPANY_NAME : 'Support') . ' <noreply@' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . '>';
+
+    if (!mail($email, $subject, $body, $headers)) {
+        jsonError('Failed to send transcript email', 500);
+    }
+
     jsonOk([]);
 }
 
