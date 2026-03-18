@@ -20,12 +20,130 @@
   ];
 
   // --------------------------------------------------------------------------
+  // Translations
+  // --------------------------------------------------------------------------
+  const TRANSLATIONS = {
+    en: {
+      statusChecking:        'Checking…',
+      statusOnline:          'Online — we reply quickly',
+      statusOffline:         'Currently offline',
+      placeholder:           'Type a message…',
+      launcherAriaLabel:     'Open support chat',
+      launcherTitle:         'Chat with us',
+      windowAriaLabel:       'Support Chat',
+      resolveTitle:          'Mark as resolved',
+      resolveAriaLabel:      'Mark chat as resolved',
+      notifTitle:            'Toggle notifications',
+      notifAriaLabel:        'Toggle notifications',
+      removeAttachment:      'Remove attachment',
+      emojiTitle:            'Emoji',
+      emojiAriaLabel:        'Emoji picker',
+      attachTitle:           'Attach file',
+      attachAriaLabel:       'Attach file',
+      audioTitle:            'Voice message',
+      audioAriaLabel:        'Record voice message',
+      locationTitle:         'Share location',
+      locationAriaLabel:     'Share location',
+      screenshotTitle:       'Share screenshot',
+      screenshotAriaLabel:   'Share screenshot',
+      imagePreviewAriaLabel: 'Image preview',
+      resolvedTitle:         'Chat resolved',
+      resolvedSub:           'This conversation has been marked as resolved.',
+      restartBtn:            'Start new chat',
+      offlineBanner:         "We are currently offline — leave a message and we'll reply soon",
+      recording:             'Recording…',
+      recordSendTitle:       'Send recording',
+      recordCancel:          '✕ Cancel',
+      resolvedByUser:        'You marked this conversation as resolved.',
+      resolvedByAgent:       'Support marked this conversation as resolved. ✅',
+      confirmResolve:        'Mark this chat as resolved?',
+      errClose:              'Could not close the chat. Please try again.',
+      errConnect:            'Could not connect. Retrying…',
+      errConnLost:           'Connection lost. Retrying…',
+      errSend:               'Failed to send message.',
+      errUpload:             'Upload failed.',
+      errScreenCapture:      'Screen capture is not supported in this browser.',
+      errScreenshot:         'Screenshot failed.',
+      errGeoUnsupported:     'Geolocation is not supported by your browser.',
+      errLocation:           'Could not send location.',
+      errLocationDenied:     'Location permission denied.',
+      errMicDenied:          'Microphone access denied.',
+      errVoice:              'Failed to send voice message.',
+      errNotifUnsupported:   'Notifications not supported in this browser.',
+      voice:                 '🎤 Voice message',
+      audio:                 '🎵 Audio',
+      video:                 '🎬 Video',
+      download:              'Download',
+      edited:                'edited',
+    },
+    de: {
+      statusChecking:        'Verbinde…',
+      statusOnline:          'Online — wir antworten schnell',
+      statusOffline:         'Zurzeit offline',
+      placeholder:           'Nachricht schreiben…',
+      launcherAriaLabel:     'Support-Chat öffnen',
+      launcherTitle:         'Mit uns chatten',
+      windowAriaLabel:       'Support-Chat',
+      resolveTitle:          'Als gelöst markieren',
+      resolveAriaLabel:      'Chat als gelöst markieren',
+      notifTitle:            'Benachrichtigungen umschalten',
+      notifAriaLabel:        'Benachrichtigungen umschalten',
+      removeAttachment:      'Anhang entfernen',
+      emojiTitle:            'Emoji',
+      emojiAriaLabel:        'Emoji-Auswahl',
+      attachTitle:           'Datei anhängen',
+      attachAriaLabel:       'Datei anhängen',
+      audioTitle:            'Sprachnachricht',
+      audioAriaLabel:        'Sprachnachricht aufnehmen',
+      locationTitle:         'Standort teilen',
+      locationAriaLabel:     'Standort teilen',
+      screenshotTitle:       'Screenshot teilen',
+      screenshotAriaLabel:   'Screenshot teilen',
+      imagePreviewAriaLabel: 'Bildvorschau',
+      resolvedTitle:         'Chat beendet',
+      resolvedSub:           'Dieses Gespräch wurde als gelöst markiert.',
+      restartBtn:            'Neuen Chat starten',
+      offlineBanner:         'Wir sind gerade offline — hinterlasse eine Nachricht und wir melden uns bald!',
+      recording:             'Aufnahme…',
+      recordSendTitle:       'Aufnahme senden',
+      recordCancel:          '✕ Abbrechen',
+      resolvedByUser:        'Du hast dieses Gespräch als gelöst markiert.',
+      resolvedByAgent:       'Der Support hat dieses Gespräch als gelöst markiert. ✅',
+      confirmResolve:        'Diesen Chat als gelöst markieren?',
+      errClose:              'Chat konnte nicht geschlossen werden. Bitte erneut versuchen.',
+      errConnect:            'Verbindung fehlgeschlagen. Erneuter Versuch…',
+      errConnLost:           'Verbindung unterbrochen. Erneuter Versuch…',
+      errSend:               'Nachricht konnte nicht gesendet werden.',
+      errUpload:             'Upload fehlgeschlagen.',
+      errScreenCapture:      'Bildschirmaufnahme wird in diesem Browser nicht unterstützt.',
+      errScreenshot:         'Screenshot fehlgeschlagen.',
+      errGeoUnsupported:     'Standortbestimmung wird von diesem Browser nicht unterstützt.',
+      errLocation:           'Standort konnte nicht gesendet werden.',
+      errLocationDenied:     'Standortfreigabe verweigert.',
+      errMicDenied:          'Mikrofonzugriff verweigert.',
+      errVoice:              'Sprachnachricht konnte nicht gesendet werden.',
+      errNotifUnsupported:   'Benachrichtigungen werden in diesem Browser nicht unterstützt.',
+      voice:                 '🎤 Sprachnachricht',
+      audio:                 '🎵 Audio',
+      video:                 '🎬 Video',
+      download:              'Herunterladen',
+      edited:                'bearbeitet',
+    },
+  };
+
+  function t(key) {
+    const lang = config.lang || 'en';
+    return (TRANSLATIONS[lang] || TRANSLATIONS.en)[key] || TRANSLATIONS.en[key] || key;
+  }
+
+  // --------------------------------------------------------------------------
   // State
   // --------------------------------------------------------------------------
   let config       = {};
   let sessionId    = null;
   let pollTimer    = null;
   let lastMsgId    = null;
+  let lastPollTs   = 0;
   let isOpen       = false;
   let isAvailable  = false;
   let unreadCount  = 0;
@@ -36,7 +154,6 @@
   let recordSeconds = 0;
   let pendingFile   = null;   // { file, dataUrl, type }
   let emojiOpen     = false;
-  let currentEmojiCat = 0;
   let initialized  = false;
   const pageUrl    = location.href;
 
@@ -104,57 +221,69 @@
 
     // Launcher button
     root.innerHTML = `
-<button id="sc-launcher" aria-label="Open support chat" title="Chat with us">
+<button id="sc-launcher" aria-label="${t('launcherAriaLabel')}" title="${t('launcherTitle')}">
   <svg class="sc-icon-chat" viewBox="0 0 24 24" fill="currentColor"><path d="M20 2H4a2 2 0 0 0-2 2v18l4-4h14a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2zm-2 10H6v-2h12v2zm0-3H6V7h12v2z"/></svg>
   <svg class="sc-icon-close" viewBox="0 0 24 24" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
   <span id="sc-badge"></span>
   <span id="sc-avail-dot"></span>
 </button>
 
-<div id="sc-window" role="dialog" aria-label="Support Chat" aria-modal="false">
+<div id="sc-window" role="dialog" aria-label="${t('windowAriaLabel')}" aria-modal="false">
   <div id="sc-header">
     <div id="sc-avatar"></div>
     <div id="sc-header-info">
       <div id="sc-company-name">Support</div>
-      <div id="sc-status-text"><span id="sc-status-dot"></span><span id="sc-status-label">Checking...</span></div>
+      <div id="sc-status-text"><span id="sc-status-dot"></span><span id="sc-status-label">${t('statusChecking')}</span></div>
     </div>
-    <button id="sc-notif-btn" title="Toggle notifications" aria-label="Toggle notifications">
+    <button id="sc-resolve-btn" title="${t('resolveTitle')}" aria-label="${t('resolveAriaLabel')}">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+    </button>
+    <button id="sc-notif-btn" title="${t('notifTitle')}" aria-label="${t('notifAriaLabel')}">
       <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></svg>
     </button>
   </div>
-  <div id="sc-offline-banner">We are currently offline — leave a message and we'll reply soon</div>
+  <div id="sc-resolved-overlay" aria-live="polite">
+    <div class="sc-resolved-icon">✅</div>
+    <div class="sc-resolved-title">${t('resolvedTitle')}</div>
+    <div class="sc-resolved-sub" id="sc-resolved-sub">${t('resolvedSub')}</div>
+    <button id="sc-restart-btn">${t('restartBtn')}</button>
+  </div>
+  <div id="sc-offline-banner">${t('offlineBanner')}</div>
   <div id="sc-messages" role="log" aria-live="polite"></div>
   <div id="sc-input-area">
     <div id="sc-attachment-preview">
       <img id="sc-preview-thumb" alt="Preview" />
       <span id="sc-preview-name"></span>
-      <button id="sc-preview-remove" aria-label="Remove attachment">✕</button>
+      <button id="sc-preview-remove" aria-label="${t('removeAttachment')}">✕</button>
     </div>
     <div id="sc-upload-progress"><div id="sc-upload-progress-bar"></div></div>
     <div id="sc-record-bar">
       <span class="sc-record-dot"></span>
       <span id="sc-record-time">0:00</span>
-      <span style="font-size:12px;color:#ef4444;flex:1">Recording…</span>
-      <button id="sc-record-send" title="Send recording" style="background:none;border:none;cursor:pointer;font-size:20px;">✅</button>
-      <button id="sc-record-cancel">✕ Cancel</button>
+      <span style="font-size:12px;color:#ef4444;flex:1">${t('recording')}</span>
+      <button id="sc-record-send" title="${t('recordSendTitle')}" style="background:none;border:none;cursor:pointer;font-size:20px;">✅</button>
+      <button id="sc-record-cancel">${t('recordCancel')}</button>
     </div>
     <div id="sc-input-toolbar">
-      <button class="sc-toolbar-btn" id="sc-emoji-toggle" title="Emoji" aria-label="Emoji picker">
+      <button class="sc-toolbar-btn" id="sc-emoji-toggle" title="${t('emojiTitle')}" aria-label="${t('emojiAriaLabel')}">
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm3.5-9c.83 0 1.5-.67 1.5-1.5S16.33 8 15.5 8 14 8.67 14 9.5s.67 1.5 1.5 1.5zm-7 0c.83 0 1.5-.67 1.5-1.5S9.33 8 8.5 8 7 8.67 7 9.5 7.67 11 8.5 11zm3.5 6.5c2.33 0 4.31-1.46 5.11-3.5H6.89c.8 2.04 2.78 3.5 5.11 3.5z"/></svg>
       </button>
-      <button class="sc-toolbar-btn" id="sc-attach-btn" title="Attach file" aria-label="Attach file">
+      <button class="sc-toolbar-btn" id="sc-attach-btn" title="${t('attachTitle')}" aria-label="${t('attachAriaLabel')}">
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M16.5 6v11.5c0 2.21-1.79 4-4 4s-4-1.79-4-4V5c0-1.38 1.12-2.5 2.5-2.5s2.5 1.12 2.5 2.5v10.5c0 .55-.45 1-1 1s-1-.45-1-1V6H10v9.5c0 1.38 1.12 2.5 2.5 2.5s2.5-1.12 2.5-2.5V5c0-2.21-1.79-4-4-4S7 2.79 7 5v12.5c0 3.04 2.46 5.5 5.5 5.5s5.5-2.46 5.5-5.5V6h-1.5z"/></svg>
       </button>
-      <button class="sc-toolbar-btn" id="sc-audio-btn" title="Voice message" aria-label="Record voice message">
+      <button class="sc-toolbar-btn" id="sc-audio-btn" title="${t('audioTitle')}" aria-label="${t('audioAriaLabel')}">
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 14c1.66 0 2.99-1.34 2.99-3L15 5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.48 6-3.3 6-6.72h-1.7z"/></svg>
       </button>
-      <button class="sc-toolbar-btn" id="sc-location-btn" title="Share location" aria-label="Share location">
+      <button class="sc-toolbar-btn" id="sc-location-btn" title="${t('locationTitle')}" aria-label="${t('locationAriaLabel')}">
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+      </button>
+      <button class="sc-toolbar-btn" id="sc-screenshot-btn" title="${t('screenshotTitle')}" aria-label="${t('screenshotAriaLabel')}">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 5h-3.17L15 3H9L7.17 5H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 14H4V7h4.05l1.83-2h4.24l1.83 2H20v12zM12 8c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5-2.24-5-5-5zm0 8c-1.65 0-3-1.35-3-3s1.35-3 3-3 3 1.35 3 3-1.35 3-3 3z"/></svg>
       </button>
     </div>
     <div id="sc-input-row">
-      <textarea id="sc-text-input" placeholder="Type a message…" rows="1" aria-label="Message input"></textarea>
-      <button id="sc-send-btn" aria-label="Send message" disabled>
+      <textarea id="sc-text-input" placeholder="${t('placeholder')}" rows="1" aria-label="${t('placeholder')}"></textarea>
+      <button id="sc-send-btn" aria-label="${t('sendAriaLabel')}" disabled>
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
       </button>
     </div>
@@ -165,7 +294,7 @@
   </div>
 </div>
 
-<div id="sc-lightbox" role="dialog" aria-label="Image preview" aria-modal="true">
+<div id="sc-lightbox" role="dialog" aria-label="${t('imagePreviewAriaLabel')}" aria-modal="true">
   <img id="sc-lightbox-img" alt="Full size image" />
 </div>
 
@@ -192,7 +321,7 @@
     if (t.radius) root.style.setProperty('--sc-radius', t.radius);
   }
 
-  function adjustColor(hex, lightness, alpha) {
+  function adjustColor(hex, _lightness, alpha) {
     // Very basic: just append alpha for light variant
     if (alpha !== undefined) return hex + '14'; // ~8% opacity approximation
     return hex;
@@ -209,11 +338,14 @@
     $('sc-attach-btn').addEventListener('click', () => $('sc-file-input').click());
     $('sc-audio-btn').addEventListener('click', toggleAudioRecording);
     $('sc-location-btn').addEventListener('click', shareLocation);
+    $('sc-screenshot-btn').addEventListener('click', captureScreenshot);
     $('sc-preview-remove').addEventListener('click', clearAttachment);
     $('sc-record-cancel').addEventListener('click', stopRecording.bind(null, false));
     $('sc-record-send').addEventListener('click', stopRecording.bind(null, true));
     $('sc-file-input').addEventListener('change', onFileSelected);
     $('sc-lightbox').addEventListener('click', closeLightbox);
+    $('sc-resolve-btn').addEventListener('click', resolveChat);
+    $('sc-restart-btn').addEventListener('click', restartChat);
 
     const textInput = $('sc-text-input');
     textInput.addEventListener('input', onTextInput);
@@ -261,6 +393,38 @@
     closeEmojiPicker();
   }
 
+  async function resolveChat() {
+    if (!sessionId) return;
+    if (!confirm(t('confirmResolve'))) return;
+    try {
+      await api('close', { session_id: sessionId, initiator: 'user' });
+      showResolved('user');
+    } catch {
+      showBanner(t('errClose'));
+    }
+  }
+
+  function showResolved(initiator) {
+    stopPolling();   // authoritative stop — called from every close path
+    const sub = $('sc-resolved-sub');
+    sub.textContent = initiator === 'user' ? t('resolvedByUser') : t('resolvedByAgent');
+    $('sc-resolved-overlay').classList.add('sc-visible');
+    $('sc-input-area').style.display  = 'none';
+    $('sc-resolve-btn').style.display = 'none';
+  }
+
+  function restartChat() {
+    // Clear session — next openChat() creates a fresh one
+    localStorage.removeItem('sc_session_id');
+    sessionId  = null;
+    lastMsgId  = null;
+    $('sc-messages').innerHTML = '';
+    $('sc-resolved-overlay').classList.remove('sc-visible');
+    $('sc-input-area').style.display  = '';
+    $('sc-resolve-btn').style.display = '';
+    initSession();
+  }
+
   // --------------------------------------------------------------------------
   // Session init
   // --------------------------------------------------------------------------
@@ -277,7 +441,7 @@
       sessionId = data.session_id;
       localStorage.setItem('sc_session_id', sessionId);
 
-      updateAvailability(data.availability);
+      updateAvailability(data.availability, data.availability_label);
       setCompanyInfo(data.company_name, data.company_avatar);
 
       // Render welcome message if fresh session
@@ -295,7 +459,7 @@
 
       startPolling();
     } catch (e) {
-      showBanner('Could not connect. Retrying…');
+      showBanner(t('errConnect'));
       setTimeout(initSession, 5000);
     }
   }
@@ -316,29 +480,70 @@
   async function poll() {
     if (!sessionId) return;
     try {
+      const thisPollTs = Math.floor(Date.now() / 1000);
       const params = new URLSearchParams({
         action:     'poll',
         session_id: sessionId,
         since_id:   lastMsgId || '',
+        since_ts:   lastPollTs,
       });
       const data = await apiFetch(`${config.endpoint}?${params}`);
+      lastPollTs = thisPollTs;
       hideBanner();
-      updateAvailability(data.availability);
+      updateAvailability(data.availability, data.availability_label);
+
+      if (data.closed) {
+        showResolved('agent');
+      }
+
+      if (data.edits && data.edits.length > 0) {
+        for (const edit of data.edits) applyEdit(edit);
+      }
 
       if (data.messages && data.messages.length > 0) {
+        const agentMessages = [];
         for (const msg of data.messages) {
           renderMessage(msg, true);
           lastMsgId = msg.id;
+          if (msg.from === 'agent') agentMessages.push(msg);
         }
         scrollToBottom();
 
-        if (!isOpen || document.hidden) {
-          incrementUnread(data.messages.length);
-          notifyAgent(data.messages);
+        if (agentMessages.length > 0 && (!isOpen || document.hidden)) {
+          incrementUnread(agentMessages.length);
+          notifyAgent(agentMessages);
         }
       }
     } catch {
-      showBanner('Connection lost. Retrying…');
+      showBanner(t('errConnLost'));
+    }
+  }
+
+  function applyEdit(edit) {
+    const row = $('sc-messages').querySelector(`[data-id="${CSS.escape(edit.id)}"]`);
+    if (!row) return;
+    const bubble = row.querySelector('.sc-bubble');
+    if (!bubble) return;
+
+    // Preserve time element and existing edited badge
+    const timeEl    = bubble.querySelector('.sc-bubble-time');
+    const badgeEl   = bubble.querySelector('.sc-edited-badge');
+
+    // Clear bubble content, then re-render text
+    while (bubble.firstChild) bubble.removeChild(bubble.firstChild);
+    renderTextBubble(bubble, edit.content);
+
+    // Re-append time
+    if (timeEl) bubble.appendChild(timeEl);
+
+    // Add or re-append edited badge
+    if (badgeEl) {
+      bubble.appendChild(badgeEl);
+    } else {
+      const badge = document.createElement('span');
+      badge.className   = 'sc-edited-badge';
+      badge.textContent = t('edited');
+      bubble.appendChild(badge);
     }
   }
 
@@ -373,7 +578,7 @@
     try {
       await api('send', { session_id: sessionId, type: 'text', text });
     } catch {
-      showBanner('Failed to send message.');
+      showBanner(t('errSend'));
     }
   }
 
@@ -413,16 +618,63 @@
         xhr.send(formData);
       });
     } catch {
-      showBanner('Upload failed.');
+      showBanner(t('errUpload'));
     }
   }
 
   // --------------------------------------------------------------------------
   // Location sharing
   // --------------------------------------------------------------------------
+  // Screen capture
+  // --------------------------------------------------------------------------
+  async function captureScreenshot() {
+    if (!navigator.mediaDevices?.getDisplayMedia) {
+      alert(t('errScreenCapture'));
+      return;
+    }
+
+    let stream;
+    try {
+      stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+    } catch {
+      // User cancelled or permission denied — silently bail
+      return;
+    }
+
+    try {
+      const track  = stream.getVideoTracks()[0];
+      const { width, height } = track.getSettings();
+
+      const video  = document.createElement('video');
+      video.srcObject = stream;
+      video.muted     = true;
+      await video.play();
+
+      const canvas  = document.createElement('canvas');
+      canvas.width  = width  || video.videoWidth;
+      canvas.height = height || video.videoHeight;
+      canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      stream.getTracks().forEach(t => t.stop());
+
+      canvas.toBlob(blob => {
+        if (!blob) { showBanner(t('errScreenshot')); return; }
+        const file    = new File([blob], 'screenshot.png', { type: 'image/png' });
+        const dataUrl = canvas.toDataURL('image/png');
+        pendingFile   = { file, dataUrl, msgType: 'image' };
+        showAttachmentPreview(file, dataUrl, 'image');
+        $('sc-send-btn').disabled = false;
+      }, 'image/png');
+    } catch {
+      stream.getTracks().forEach(t => t.stop());
+      showBanner(t('errScreenshot'));
+    }
+  }
+
+  // --------------------------------------------------------------------------
   function shareLocation() {
     if (!navigator.geolocation) {
-      alert('Geolocation is not supported by your browser.');
+      alert(t('errGeoUnsupported'));
       return;
     }
     navigator.geolocation.getCurrentPosition(async (pos) => {
@@ -441,10 +693,10 @@
         renderMessage(msg, false);
         scrollToBottom();
       } catch {
-        showBanner('Could not send location.');
+        showBanner(t('errLocation'));
       }
     }, () => {
-      alert('Location permission denied.');
+      alert(t('errLocationDenied'));
     });
   }
 
@@ -461,24 +713,27 @@
     try {
       stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     } catch {
-      alert('Microphone access denied.');
+      alert(t('errMicDenied'));
       return;
     }
 
-    const mimeType = ['audio/webm;codecs=opus', 'audio/ogg;codecs=opus', 'audio/webm', 'audio/ogg']
+    // Prefer ogg/opus — Telegram plays it natively as a voice message with waveform.
+    // Chrome only supports webm; the PHP backend will convert it to ogg via ffmpeg if available.
+    const mimeType = ['audio/ogg;codecs=opus', 'audio/ogg', 'audio/webm;codecs=opus', 'audio/webm']
       .find((m) => MediaRecorder.isTypeSupported(m)) || '';
 
-    const chunks = [];
+    const chunks        = [];
+    const resolvedMime  = mimeType || 'audio/webm';   // capture now — mediaRecorder is null by the time onstop fires
     mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : {});
     mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
     mediaRecorder.onstop = () => {
       stream.getTracks().forEach((t) => t.stop());
       if (!chunks.length) return;
-      const blob = new Blob(chunks, { type: mediaRecorder.mimeType || 'audio/webm' });
-      const ext  = blob.type.includes('ogg') ? '.ogg' : '.webm';
-      const file = new File([blob], 'voice_message' + ext, { type: blob.type });
+      const blob = new Blob(chunks, { type: resolvedMime });
+      const ext  = resolvedMime.includes('ogg') ? '.ogg' : '.webm';
+      const file = new File([blob], 'voice_message' + ext, { type: resolvedMime });
       pendingFile = { file, dataUrl: null, msgType: 'voice' };
-      uploadFile();
+      uploadFile().catch(() => showBanner(t('errVoice')));
     };
 
     mediaRecorder.start();
@@ -555,7 +810,6 @@
   // --------------------------------------------------------------------------
   function buildEmojiPicker() {
     const tabs = $('sc-emoji-tabs');
-    const grid = $('sc-emoji-grid');
 
     EMOJI_CATEGORIES.forEach((cat, idx) => {
       const btn = document.createElement('button');
@@ -574,7 +828,6 @@
   }
 
   function renderEmojiGrid(catIdx) {
-    currentEmojiCat = catIdx;
     const grid = $('sc-emoji-grid');
     grid.innerHTML = '';
     EMOJI_CATEGORIES[catIdx].emoji.forEach((em) => {
@@ -630,6 +883,17 @@
   // Message rendering
   // --------------------------------------------------------------------------
   function renderMessage(msg, animate) {
+    // System event — render inline banner, not a chat bubble
+    if (msg.from === 'system' && msg.type === 'closed') {
+      const el = document.createElement('div');
+      el.className   = 'sc-system-msg';
+      el.textContent = msg.content || 'Chat resolved.';
+      $('sc-messages').appendChild(el);
+      scrollToBottom(false);
+      showResolved(msg.closed_by || 'agent');
+      return;
+    }
+
     const isUser  = msg.from === 'user';
     const isAgent = msg.from === 'agent';
     const container = $('sc-messages');
@@ -673,25 +937,26 @@
     }
 
     // Bubble
-    const bubble = document.createElement('div');
+    const bubble  = document.createElement('div');
     bubble.className = 'sc-bubble';
+    const fileUrl = resolveFileUrl(msg.file_url);
 
     switch (msg.type) {
       case 'text':
-        renderTextBubble(bubble, msg.content, isUser);
+        renderTextBubble(bubble, msg.content);
         break;
       case 'image':
-        renderImageBubble(bubble, msg.file_url || msg.telegram_file_id, msg.content, isUser);
+        renderImageBubble(bubble, fileUrl, msg.content);
         break;
       case 'voice':
       case 'audio':
-        renderAudioBubble(bubble, msg.file_url, msg.type);
+        renderAudioBubble(bubble, fileUrl, msg.type);
         break;
       case 'video':
-        renderVideoBubble(bubble, msg.file_url);
+        renderVideoBubble(bubble, fileUrl);
         break;
       case 'file':
-        renderFileBubble(bubble, msg.content, msg.file_url);
+        renderFileBubble(bubble, msg.content, fileUrl);
         break;
       case 'location':
         renderLocationBubble(bubble, msg.lat, msg.lng);
@@ -719,7 +984,7 @@
     }
   }
 
-  function renderTextBubble(bubble, text, isUser) {
+  function renderTextBubble(bubble, text) {
     const parts = parseLinks(text || '');
     for (const part of parts) {
       if (part.type === 'link') {
@@ -735,7 +1000,7 @@
     }
   }
 
-  function renderImageBubble(bubble, src, caption, isUser) {
+  function renderImageBubble(bubble, src, caption) {
     bubble.classList.add('sc-bubble-image');
     if (src) {
       const img = document.createElement('img');
@@ -761,7 +1026,7 @@
       bubble.appendChild(audio);
     } else {
       const icon = document.createElement('span');
-      icon.textContent = type === 'voice' ? '🎤 Voice message' : '🎵 Audio';
+      icon.textContent = type === 'voice' ? t('voice') : t('audio');
       bubble.appendChild(icon);
     }
   }
@@ -775,7 +1040,7 @@
       video.style.borderRadius = '10px';
       bubble.appendChild(video);
     } else {
-      bubble.textContent = '🎬 Video';
+      bubble.textContent = t('video');
     }
   }
 
@@ -795,12 +1060,12 @@
       link.target = '_blank';
       link.rel    = 'noopener noreferrer';
       link.className   = 'sc-bubble-file-name';
-      link.textContent = name || 'Download';
+      link.textContent = name || t('download');
       info.appendChild(link);
     } else {
       const nameEl = document.createElement('div');
       nameEl.className   = 'sc-bubble-file-name';
-      nameEl.textContent = name || 'File';
+      nameEl.textContent = name || t('download');
       info.appendChild(nameEl);
     }
 
@@ -851,19 +1116,19 @@
   // --------------------------------------------------------------------------
   // Availability
   // --------------------------------------------------------------------------
-  function updateAvailability(avail) {
+  function updateAvailability(avail, labelText) {
     isAvailable = !!avail;
     const dot      = $('sc-avail-dot');
     const statusDot = $('sc-status-dot');
     const label    = $('sc-status-label');
     const banner   = $('sc-offline-banner');
 
-    dot.className      = 'sc-avail-dot ' + (isAvailable ? 'sc-online' : 'sc-offline');
+    dot.className       = 'sc-avail-dot ' + (isAvailable ? 'sc-online' : 'sc-offline');
     statusDot.className = 'sc-status-dot ' + (isAvailable ? 'sc-online' : '');
-    label.textContent  = isAvailable ? 'Online — we reply quickly' : 'Currently offline';
+    label.textContent   = labelText || t(isAvailable ? 'statusOnline' : 'statusOffline');
 
     if (!isAvailable && sessionId) {
-      banner.textContent = (config.offlineMessage || AVAILABILITY_SCHEDULE?.offline_message || 'We are currently offline — leave a message and we\'ll reply soon');
+      banner.textContent = config.offlineMessage || t('offlineBanner');
       banner.classList.add('sc-visible');
     } else {
       banner.classList.remove('sc-visible');
@@ -894,7 +1159,7 @@
     }
 
     if (!('Notification' in window)) {
-      alert('Notifications not supported in this browser.');
+      alert(t('errNotifUnsupported'));
       return;
     }
 
@@ -1035,6 +1300,15 @@
   // Utility
   // --------------------------------------------------------------------------
   function $(id) { return document.getElementById(id); }
+
+  // Resolve a server-returned file_url like "?action=file&..." to a full URL.
+  // The server returns query-string-only URLs; browsers resolve them relative
+  // to the current page, not to chat.php — so we prepend the endpoint path.
+  function resolveFileUrl(url) {
+    if (!url) return url;
+    if (url.startsWith('?')) return config.endpoint.split('?')[0] + url;
+    return url;
+  }
 
   function formatTime(ts) {
     if (!ts) return '';

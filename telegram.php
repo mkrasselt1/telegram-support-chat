@@ -119,6 +119,44 @@ class TelegramBot
         return $this->request('getUpdates', $params);
     }
 
+    /**
+     * Resolves a Telegram file_id to a download URL, then downloads the file
+     * into $destDir. Returns the saved filename on success, null on failure.
+     */
+    public function downloadFile(string $fileId, string $destDir): ?string
+    {
+        try {
+            $info     = $this->request('getFile', ['file_id' => $fileId]);
+            $filePath = $info['file_path'] ?? null;
+            if (!$filePath) return null;
+
+            $url  = "https://api.telegram.org/file/bot{$this->token}/{$filePath}";
+            $ext  = pathinfo($filePath, PATHINFO_EXTENSION);
+            $name = substr($fileId, -16) . ($ext ? '.' . $ext : '');
+            $dest = rtrim($destDir, '/') . '/' . $name;
+
+            if (!is_dir($destDir)) mkdir($destDir, 0750, true);
+
+            $ch = curl_init($url);
+            $fp = fopen($dest, 'wb');
+            curl_setopt_array($ch, [
+                CURLOPT_FILE           => $fp,
+                CURLOPT_FOLLOWLOCATION => true,
+                CURLOPT_TIMEOUT        => 30,
+                CURLOPT_SSL_VERIFYPEER => true,
+            ]);
+            curl_exec($ch);
+            $ok = curl_getinfo($ch, CURLINFO_HTTP_CODE) === 200;
+            fclose($fp);
+
+            if (!$ok) { @unlink($dest); return null; }
+            return $name;
+        } catch (TelegramException $e) {
+            error_log('TelegramBot::downloadFile — ' . $e->getMessage());
+            return null;
+        }
+    }
+
     public function getMe(): array
     {
         return $this->request('getMe');

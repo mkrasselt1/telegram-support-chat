@@ -65,23 +65,64 @@ processUpdate($update);
 // Processing
 // =============================================================================
 
+// Commands an agent can type in the Telegram thread to close the session
+const CLOSE_COMMANDS = ['/close', '/resolved', '/done', '/closed'];
+
 function processUpdate(array $update): void
 {
-    $msg = $update['message'] ?? $update['edited_message'] ?? null;
+    $isEdit = isset($update['edited_message']) && !isset($update['message']);
+    $msg    = $update['message'] ?? $update['edited_message'] ?? null;
     if (!$msg) return;
 
     // Ignore bots
     if ($msg['from']['is_bot'] ?? false) return;
-    if (BOT_USER_ID && (int)($msg['from']['id'] ?? 0) === BOT_USER_ID) return;
+    if (BOT_USER_ID !== 0 && (int)($msg['from']['id'] ?? 0) === BOT_USER_ID) return;
 
-    $threadId = $msg['message_thread_id'] ?? null;
-    if ($threadId === null) return;  // ignore messages not in a thread
+    $threadId  = $msg['message_thread_id'] ?? null;
+    $agentName = trim(($msg['from']['first_name'] ?? '') . ' ' . ($msg['from']['last_name'] ?? '')) ?: COMPANY_NAME;
+    $text      = trim($msg['text'] ?? '');
+    $command   = strtolower(preg_replace('/@\S+$/', '', $text));
+    $bot       = new TelegramBot(TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID);
+
+    // /online and /offline are group-wide — work even in the General topic
+    // where message_thread_id is absent.
+    if ($command === '/online' || $command === '/offline') {
+        setAgentManualStatus($agentName, ltrim($command, '/'));
+        if ($threadId !== null) {
+            $reply = $command === '/online'
+                ? "✅ Status set to <b>online</b> (valid 12 h)."
+                : "🔴 Status set to <b>offline</b> (valid 12 h).";
+            try { $bot->sendMessage($reply, (int)$threadId); } catch (Exception) {}
+        }
+        return;
+    }
+
+    if ($threadId === null) return;  // all other commands require a thread
 
     $sessionId = lookupSession((int) $threadId);
     if (!$sessionId) return;  // update is for a thread we don't manage
 
+    if (in_array($command, CLOSE_COMMANDS, true)) {
+        closeSession($sessionId, 'agent', $bot);
+        return;
+    }
+
+    // Edited message — update existing entry in session history
+    if ($isEdit) {
+        $telegramMsgId = (int)($msg['message_id'] ?? 0);
+        if ($telegramMsgId && !empty($msg['text'])) {
+            updateAgentMessageInSession($sessionId, $telegramMsgId, [
+                'content'   => $msg['text'],
+                'edited_at' => time(),
+            ]);
+        }
+        return;
+    }
+
     $agentMsg = formatAgentMessage($msg);
+    $agentMsg = resolveAgentFile($agentMsg, $sessionId, $bot);
     appendToInbox($sessionId, $agentMsg);
+    recordAgentActivity($agentName);
 }
 
 function lookupSession(int $threadId): ?string
@@ -104,10 +145,11 @@ function formatAgentMessage(array $msg): array
     if (!$agentName) $agentName = COMPANY_NAME;
 
     $base = [
-        'id'         => generateUuid(),
-        'from'       => 'agent',
-        'agent_name' => $agentName,
-        'timestamp'  => $msg['date'],
+        'id'                  => generateUuid(),
+        'from'                => 'agent',
+        'agent_name'          => $agentName,
+        'timestamp'           => $msg['date'],
+        'telegram_message_id' => $msg['message_id'] ?? null,
     ];
 
     if (!empty($msg['text'])) {
@@ -142,6 +184,70 @@ function formatAgentMessage(array $msg): array
 }
 
 // --- Shared helpers (duplicated from chat.php to keep webhook.php self-contained) ---
+
+function closeSession(string $sessionId, string $initiator, $bot): void
+{
+    $path = SESSION_DIR . '/' . $sessionId . '.json';
+    if (!file_exists($path)) return;
+
+    $fp = fopen($path, 'r+');
+    flock($fp, LOCK_EX);
+    $session = json_decode(stream_get_contents($fp), true) ?? [];
+
+    if (($session['status'] ?? 'open') === 'closed') {
+        flock($fp, LOCK_UN); fclose($fp); return;
+    }
+
+    $session['status']    = 'closed';
+    $session['closed_at'] = time();
+    $session['closed_by'] = $initiator;
+    $closedMessages = [
+        'en' => ['user' => 'You marked this chat as resolved.', 'agent' => 'Support marked this chat as resolved. ✅'],
+        'de' => ['user' => 'Du hast dieses Gespräch als gelöst markiert.', 'agent' => 'Der Support hat dieses Gespräch als gelöst markiert. ✅'],
+    ];
+    $lang    = defined('LANGUAGE') ? LANGUAGE : 'en';
+    $msgLang = $closedMessages[$lang] ?? $closedMessages['en'];
+
+    $session['history'][] = [
+        'id'        => generateUuid(),
+        'from'      => 'system',
+        'type'      => 'closed',
+        'content'   => $msgLang[$initiator] ?? $msgLang['agent'],
+        'closed_by' => $initiator,
+        'timestamp' => time(),
+    ];
+
+    rewind($fp); ftruncate($fp, 0);
+    fwrite($fp, json_encode($session, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+    flock($fp, LOCK_UN); fclose($fp);
+
+    $threadId = $session['thread_id'] ?? null;
+    if ($threadId !== null) {
+        try {
+            $bot->sendMessage('✅ Chat closed by support agent.', (int) $threadId);
+            $bot->closeForumTopic((int) $threadId);
+        } catch (Exception $e) {
+            error_log('closeSession: ' . $e->getMessage());
+        }
+    }
+}
+
+function resolveAgentFile(array $msg, string $sessionId, TelegramBot $bot): array
+{
+    $fileId = $msg['telegram_file_id'] ?? null;
+    if (!$fileId) return $msg;
+
+    $destDir  = UPLOAD_DIR . '/' . $sessionId;
+    $fileName = $bot->downloadFile($fileId, $destDir);
+
+    if ($fileName) {
+        $msg['file_url'] = '?action=file&session_id=' . urlencode($sessionId)
+            . '&name=' . urlencode($fileName);
+    }
+
+    unset($msg['telegram_file_id']);
+    return $msg;
+}
 
 function appendToInbox(string $sessionId, array $message): void
 {
@@ -182,10 +288,10 @@ function maybeNotifyByEmail(string $sessionId, array $message): void
     $email    = $session['user_info']['email'] ?? '';
 
     if (!$email || !filter_var($email, FILTER_VALIDATE_EMAIL)) return;
-    if ((time() - $lastSeen) < OFFLINE_NOTIFY_AFTER)           return;
+    if (time() - $lastSeen < OFFLINE_NOTIFY_AFTER)           return;
 
     $flagFile = SESSION_DIR . '/' . $sessionId . '_notified.txt';
-    if (file_exists($flagFile) && (time() - filemtime($flagFile)) < 3600) return;
+    if (file_exists($flagFile) && time() - filemtime($flagFile) < 3600) return;
     touch($flagFile);
 
     $name    = $session['user_info']['name'] ?? 'there';
@@ -201,6 +307,52 @@ function maybeNotifyByEmail(string $sessionId, array $message): void
     $headers = 'From: ' . OFFLINE_NOTIFY_EMAIL . "\r\nContent-Type: text/plain; charset=UTF-8\r\n";
 
     @mail($email, $subject, $body, $headers);
+}
+
+function updateAgentMessageInSession(string $sessionId, int $telegramMsgId, array $fields): void
+{
+    $path = SESSION_DIR . '/' . $sessionId . '.json';
+    if (!file_exists($path)) return;
+    $fp = fopen($path, 'r+');
+    flock($fp, LOCK_EX);
+    $session = json_decode(stream_get_contents($fp), true) ?? [];
+    foreach ($session['history'] as &$msg) {
+        if (($msg['telegram_message_id'] ?? null) === $telegramMsgId) {
+            foreach ($fields as $k => $v) $msg[$k] = $v;
+            break;
+        }
+    }
+    unset($msg);
+    rewind($fp); ftruncate($fp, 0);
+    fwrite($fp, json_encode($session, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+    flock($fp, LOCK_UN); fclose($fp);
+}
+
+function recordAgentActivity(string $agentName): void
+{
+    $path   = UPDATES_DIR . '/agent_status.json';
+    $fp     = fopen($path, 'c+');
+    flock($fp, LOCK_EX);
+    $status = json_decode(stream_get_contents($fp), true) ?? [];
+    $status['last_activity_at']  = time();
+    $status['last_active_agent'] = $agentName;
+    rewind($fp); ftruncate($fp, 0);
+    fwrite($fp, json_encode($status));
+    flock($fp, LOCK_UN); fclose($fp);
+}
+
+function setAgentManualStatus(string $agentName, string $value): void
+{
+    $path   = UPDATES_DIR . '/agent_status.json';
+    $fp     = fopen($path, 'c+');
+    flock($fp, LOCK_EX);
+    $status = json_decode(stream_get_contents($fp), true) ?? [];
+    $status['manual']    = $value;
+    $status['manual_by'] = $agentName;
+    $status['manual_at'] = time();
+    rewind($fp); ftruncate($fp, 0);
+    fwrite($fp, json_encode($status));
+    flock($fp, LOCK_UN); fclose($fp);
 }
 
 function generateUuid(): string

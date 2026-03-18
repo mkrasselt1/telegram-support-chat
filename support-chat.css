@@ -268,6 +268,13 @@
   opacity: .65;
   text-align: right;
 }
+.sc-edited-badge {
+  display: block;
+  font-size: 10px;
+  opacity: .5;
+  text-align: right;
+  font-style: italic;
+}
 .sc-agent-name {
   font-size: 11px;
   color: var(--sc-text-muted);
@@ -616,6 +623,38 @@
   padding: 6px 12px;
 }
 #sc-offline-banner.sc-visible { display: block; }
+
+/* ---- Resolved overlay ---- */
+#sc-resolved-overlay {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 32px 24px;
+  background: var(--sc-bg);
+  position: absolute;
+  inset: 60px 0 0 0; /* below header */
+  z-index: 5;
+  text-align: center;
+}
+#sc-resolved-overlay.sc-visible { display: flex; }
+.sc-resolved-icon  { font-size: 44px; }
+.sc-resolved-title { font-size: 18px; font-weight: 700; color: var(--sc-text); }
+.sc-resolved-sub   { font-size: 14px; color: var(--sc-text-muted); max-width: 260px; line-height: 1.5; }
+#sc-restart-btn {
+  margin-top: 8px;
+  padding: 10px 24px;
+  background: var(--sc-primary);
+  color: #fff;
+  border: none;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--sc-anim);
+}
+#sc-restart-btn:hover { background: var(--sc-primary-dark); }
 
 /* ---- Lightbox for images ---- */
 #sc-lightbox {

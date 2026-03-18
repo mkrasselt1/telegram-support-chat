@@ -31,6 +31,7 @@ switch ($action) {
     case 'poll':   actionPoll();   break;
     case 'upload': actionUpload(); break;
     case 'file':   actionFile();   break;
+    case 'close':  actionClose();  break;
     default:       jsonError('Unknown action', 400);
 }
 
@@ -58,14 +59,16 @@ function actionInit(): void
         $session   = createSession($sessionId, $userInfo, $pageUrl, $userAgent, $bot);
     }
 
+    $avail = checkAvailability();
     jsonOk([
         'session_id'       => $sessionId,
         'welcome_message'  => WELCOME_MESSAGE,
         'company_name'     => COMPANY_NAME,
         'company_avatar'   => COMPANY_AVATAR,
-        'availability'     => checkAvailability(),
+        'availability'     => $avail['online'],
+        'availability_label' => $avail['label'],
         'offline_message'  => AVAILABILITY_SCHEDULE['offline_message'],
-        'history'          => array_slice($session['history'] ?? [], -50),  // last 50 msgs
+        'history'          => array_slice($session['history'] ?? [], -50),
     ]);
 }
 
@@ -125,6 +128,7 @@ function actionPoll(): void
 {
     $sessionId = sanitizeSessionId($_GET['session_id'] ?? '');
     $sinceId   = $_GET['since_id'] ?? '';
+    $sinceTs   = (int)($_GET['since_ts'] ?? 0);
 
     if (!$sessionId || !sessionExists($sessionId)) {
         jsonError('Invalid session', 400);
@@ -155,16 +159,51 @@ function actionPoll(): void
             }
             continue;
         }
-        // Only surface messages sent by the agent (user messages the client already knows)
-        if (($msg['from'] ?? '') === 'agent') {
+        // Surface agent messages and system events (e.g. session closed)
+        $from = $msg['from'] ?? '';
+        if ($from === 'agent' || $from === 'system') {
             $new[] = $msg;
         }
     }
 
+    $avail = checkAvailability();
+    // Collect edits: agent messages updated since client's last poll timestamp
+    $edits = [];
+    foreach ($session['history'] as $msg) {
+        if (isset($msg['edited_at']) && $msg['edited_at'] >= $sinceTs && ($msg['from'] ?? '') === 'agent') {
+            $edits[] = [
+                'id'        => $msg['id'],
+                'type'      => $msg['type'] ?? 'text',
+                'content'   => $msg['content'] ?? '',
+                'edited_at' => $msg['edited_at'],
+            ];
+        }
+    }
+
+    $avail = checkAvailability();
     jsonOk([
-        'messages'     => $new,
-        'availability' => checkAvailability(),
+        'messages'           => $new,
+        'edits'              => $edits,
+        'availability'       => $avail['online'],
+        'availability_label' => $avail['label'],
+        'closed'             => ($session['status'] ?? 'open') === 'closed',
     ]);
+}
+
+function actionClose(): void
+{
+    $body      = jsonBody();
+    $sessionId = sanitizeSessionId($body['session_id'] ?? '');
+    $initiator = in_array($body['initiator'] ?? '', ['user', 'agent'], true)
+        ? $body['initiator']
+        : 'user';
+
+    if (!$sessionId || !sessionExists($sessionId)) {
+        jsonError('Invalid session', 400);
+    }
+
+    closeSession($sessionId, $initiator, makeTelegramBot());
+    jsonOk([]);
 }
 
 function actionUpload(): void
@@ -223,12 +262,13 @@ function actionUpload(): void
     } elseif (str_starts_with($mimeType, 'video/')) {
         $bot->sendVideo($destPath, $threadId, $caption);
         $msgType = 'video';
-    } elseif (str_starts_with($mimeType, 'audio/') && str_contains($mimeType, 'ogg')) {
-        $bot->sendVoice($destPath, $threadId);
-        $msgType = 'voice';
     } elseif (str_starts_with($mimeType, 'audio/')) {
-        $bot->sendAudio($destPath, $threadId, $caption);
-        $msgType = 'audio';
+        // Telegram sendVoice requires OGG/Opus for native waveform playback.
+        // If the browser sent webm (Chrome), convert to ogg/opus via ffmpeg.
+        [$voicePath, $converted] = convertToOggOpus($destPath, $mimeType);
+        $bot->sendVoice($voicePath, $threadId);
+        if ($converted) @unlink($voicePath);
+        $msgType = 'voice';
     } else {
         $bot->sendDocument($destPath, $threadId, $caption);
         $msgType = 'file';
@@ -283,6 +323,66 @@ function actionFile(): void
 // =============================================================================
 // SESSION MANAGEMENT
 // =============================================================================
+
+function closeSession(string $sessionId, string $initiator, TelegramBot $bot): void
+{
+    $path = SESSION_DIR . '/' . $sessionId . '.json';
+    $fp   = fopen($path, 'r+');
+    flock($fp, LOCK_EX);
+    $session = json_decode(stream_get_contents($fp), true) ?? [];
+
+    if (($session['status'] ?? 'open') === 'closed') {
+        // Already closed — nothing to do
+        flock($fp, LOCK_UN);
+        fclose($fp);
+        return;
+    }
+
+    $session['status']    = 'closed';
+    $session['closed_at'] = time();
+    $session['closed_by'] = $initiator;
+
+    // Append system message so the widget picks it up on the next poll
+    $closedMessages = [
+        'en' => [
+            'user'  => 'You marked this chat as resolved.',
+            'agent' => 'Support marked this chat as resolved. ✅',
+        ],
+        'de' => [
+            'user'  => 'Du hast dieses Gespräch als gelöst markiert.',
+            'agent' => 'Der Support hat dieses Gespräch als gelöst markiert. ✅',
+        ],
+    ];
+    $lang    = defined('LANGUAGE') ? LANGUAGE : 'en';
+    $msgLang = $closedMessages[$lang] ?? $closedMessages['en'];
+
+    $session['history'][] = [
+        'id'        => generateUuid(),
+        'from'      => 'system',
+        'type'      => 'closed',
+        'content'   => $msgLang[$initiator] ?? $msgLang['agent'],
+        'closed_by' => $initiator,
+        'timestamp' => time(),
+    ];
+
+    rewind($fp);
+    ftruncate($fp, 0);
+    fwrite($fp, json_encode($session, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+    flock($fp, LOCK_UN);
+    fclose($fp);
+
+    // Notify the Telegram thread and close the topic
+    $threadId = $session['thread_id'] ?? null;
+    if ($threadId !== null) {
+        try {
+            $who = $initiator === 'user' ? 'user' : 'support agent';
+            $bot->sendMessage("✅ Chat closed by {$who}.", (int) $threadId);
+            $bot->closeForumTopic((int) $threadId);
+        } catch (TelegramException $e) {
+            error_log('Support Chat closeSession: ' . $e->getMessage());
+        }
+    }
+}
 
 function sessionExists(string $sessionId): bool
 {
@@ -372,6 +472,27 @@ function touchSession(string $sessionId): void
     flock($fp, LOCK_EX);
     $session = json_decode(stream_get_contents($fp), true) ?? [];
     $session['last_activity'] = time();
+    rewind($fp);
+    ftruncate($fp, 0);
+    fwrite($fp, json_encode($session, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+    flock($fp, LOCK_UN);
+    fclose($fp);
+}
+
+function updateAgentMessageInSession(string $sessionId, int $telegramMsgId, array $fields): void
+{
+    $path = SESSION_DIR . '/' . $sessionId . '.json';
+    if (!file_exists($path)) return;
+    $fp = fopen($path, 'r+');
+    flock($fp, LOCK_EX);
+    $session = json_decode(stream_get_contents($fp), true) ?? [];
+    foreach ($session['history'] as &$msg) {
+        if (($msg['telegram_message_id'] ?? null) === $telegramMsgId) {
+            foreach ($fields as $k => $v) $msg[$k] = $v;
+            break;
+        }
+    }
+    unset($msg);
     rewind($fp);
     ftruncate($fp, 0);
     fwrite($fp, json_encode($session, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
@@ -522,7 +643,8 @@ function fetchAndDistributeUpdates(TelegramBot $bot): void
         $threadIndex = loadThreadIndex();
 
         foreach ($updates as $update) {
-            $msg = $update['message'] ?? $update['edited_message'] ?? null;
+            $isEdit = isset($update['edited_message']) && !isset($update['message']);
+            $msg    = $update['message'] ?? $update['edited_message'] ?? null;
             if (!$msg) continue;
 
             // Skip messages from bots (including ourselves)
@@ -530,13 +652,48 @@ function fetchAndDistributeUpdates(TelegramBot $bot): void
             if (BOT_USER_ID !== 0 && (int)($msg['from']['id'] ?? 0) === BOT_USER_ID) continue;
 
             $threadId = $msg['message_thread_id'] ?? null;
-            if ($threadId === null) continue;  // ignore messages not in a thread
+
+            // Extract command early — /online and /offline work in any thread,
+            // including the General topic where message_thread_id is absent.
+            $agentName = trim(($msg['from']['first_name'] ?? '') . ' ' . ($msg['from']['last_name'] ?? '')) ?: COMPANY_NAME;
+            $text      = trim($msg['text'] ?? '');
+            $command   = strtolower(preg_replace('/@\S+$/', '', $text));
+
+            if ($command === '/online' || $command === '/offline') {
+                setAgentManualStatus($agentName, ltrim($command, '/'));
+                if ($threadId !== null) {
+                    $reply = $command === '/online'
+                        ? "✅ Status set to <b>online</b> (valid 12 h)."
+                        : "🔴 Status set to <b>offline</b> (valid 12 h).";
+                    try { $bot->sendMessage($reply, (int)$threadId); } catch (TelegramException $e) {}
+                }
+                continue;
+            }
 
             $sessionId = $threadIndex[(string)$threadId] ?? null;
             if (!$sessionId) continue;
 
+            // Edited message — update in-place instead of appending
+            if ($isEdit) {
+                $telegramMsgId = (int)($msg['message_id'] ?? 0);
+                if ($telegramMsgId && !empty($msg['text'])) {
+                    updateAgentMessageInSession($sessionId, $telegramMsgId, [
+                        'content'   => $msg['text'],
+                        'edited_at' => time(),
+                    ]);
+                }
+                continue;
+            }
+
+            if (in_array($command, ['/close', '/resolved', '/done', '/closed'], true)) {
+                closeSession($sessionId, 'agent', $bot);
+                continue;
+            }
+
             $agentMsg = formatAgentMessage($msg);
+            $agentMsg = resolveAgentFile($agentMsg, $sessionId, $bot);
             appendToInbox($sessionId, $agentMsg);
+            recordAgentActivity($agentName);
         }
 
         $lastUpdateId = end($updates)['update_id'];
@@ -550,16 +707,38 @@ function fetchAndDistributeUpdates(TelegramBot $bot): void
     }
 }
 
+/**
+ * If an agent message carries a telegram_file_id (image, voice, audio, document),
+ * download the file locally and replace the opaque ID with a servable file_url.
+ */
+function resolveAgentFile(array $msg, string $sessionId, TelegramBot $bot): array
+{
+    $fileId = $msg['telegram_file_id'] ?? null;
+    if (!$fileId) return $msg;
+
+    $destDir  = UPLOAD_DIR . '/' . $sessionId;
+    $fileName = $bot->downloadFile($fileId, $destDir);
+
+    if ($fileName) {
+        $msg['file_url'] = '?action=file&session_id=' . urlencode($sessionId)
+            . '&name=' . urlencode($fileName);
+    }
+
+    unset($msg['telegram_file_id']);
+    return $msg;
+}
+
 function formatAgentMessage(array $msg): array
 {
     $agentName = trim(($msg['from']['first_name'] ?? '') . ' ' . ($msg['from']['last_name'] ?? ''));
     if (!$agentName) $agentName = COMPANY_NAME;
 
     $base = [
-        'id'         => generateUuid(),
-        'from'       => 'agent',
-        'agent_name' => $agentName,
-        'timestamp'  => $msg['date'],
+        'id'                  => generateUuid(),
+        'from'                => 'agent',
+        'agent_name'          => $agentName,
+        'timestamp'           => $msg['date'],
+        'telegram_message_id' => $msg['message_id'] ?? null,
     ];
 
     if (!empty($msg['text'])) {
@@ -604,19 +783,123 @@ function formatAgentMessage(array $msg): array
 // AVAILABILITY
 // =============================================================================
 
-function checkAvailability(): bool
+function agentStatusPath(): string
 {
+    return UPDATES_DIR . '/agent_status.json';
+}
+
+function loadAgentStatus(): array
+{
+    $path = agentStatusPath();
+    if (!file_exists($path)) return [];
+    $fp   = fopen($path, 'r');
+    flock($fp, LOCK_SH);
+    $data = json_decode(stream_get_contents($fp), true) ?? [];
+    flock($fp, LOCK_UN);
+    fclose($fp);
+    return $data;
+}
+
+function saveAgentStatus(array $data): void
+{
+    $path = agentStatusPath();
+    $fp   = fopen($path, 'c+');
+    flock($fp, LOCK_EX);
+    rewind($fp);
+    ftruncate($fp, 0);
+    fwrite($fp, json_encode($data));
+    flock($fp, LOCK_UN);
+    fclose($fp);
+}
+
+/** Record that an agent sent a message — used as passive online signal. */
+function recordAgentActivity(string $agentName): void
+{
+    $status = loadAgentStatus();
+    $status['last_activity_at'] = time();
+    $status['last_active_agent'] = $agentName;
+    saveAgentStatus($status);
+}
+
+/** Handle /online or /offline command from an agent. */
+function setAgentManualStatus(string $agentName, string $value): void
+{
+    $status = loadAgentStatus();
+    $status['manual']      = $value;       // 'online' | 'offline'
+    $status['manual_by']   = $agentName;
+    $status['manual_at']   = time();
+    saveAgentStatus($status);
+}
+
+/**
+ * Returns availability + a short label for the widget status line.
+ * Priority:
+ *   1. Explicit /offline set within 12 h            → offline
+ *   2. Explicit /online  set within 12 h            → online
+ *   3. Agent sent a message within AGENT_ACTIVE_WINDOW seconds → online
+ *   4. Schedule                                      → online/offline
+ */
+function checkAvailability(): array
+{
+    $lang    = defined('LANGUAGE') ? LANGUAGE : 'en';
+    $labels  = [
+        'en' => [
+            'online_manual'   => '%s is online',
+            'offline_manual'  => "We'll be back soon",
+            'active'          => '%s is active',
+            'available'       => 'Available now',
+            'offline_sched'   => 'Currently offline',
+        ],
+        'de' => [
+            'online_manual'   => '%s ist online',
+            'offline_manual'  => 'Wir sind gleich zurück',
+            'active'          => '%s ist aktiv',
+            'available'       => 'Jetzt verfügbar',
+            'offline_sched'   => 'Zurzeit offline',
+        ],
+    ];
+    $l = $labels[$lang] ?? $labels['en'];
+
+    $status    = loadAgentStatus();
+    $now       = time();
+    $manualAge = isset($status['manual_at']) ? $now - (int)$status['manual_at'] : PHP_INT_MAX;
+
+    // 1 & 2 — explicit manual override (valid for 12 hours)
+    if ($manualAge < 12 * 3600 && isset($status['manual'])) {
+        $online = $status['manual'] === 'online';
+        $by     = $status['manual_by'] ?? COMPANY_NAME;
+        return [
+            'online' => $online,
+            'label'  => $online ? sprintf($l['online_manual'], $by) : $l['offline_manual'],
+            'source' => 'manual',
+        ];
+    }
+
+    // 3 — recent agent activity
+    $activityAge = isset($status['last_activity_at']) ? $now - (int)$status['last_activity_at'] : PHP_INT_MAX;
+    if ($activityAge < AGENT_ACTIVE_WINDOW) {
+        $by = $status['last_active_agent'] ?? COMPANY_NAME;
+        return [
+            'online' => true,
+            'label'  => sprintf($l['active'], $by),
+            'source' => 'activity',
+        ];
+    }
+
+    // 4 — schedule fallback
     $schedule = AVAILABILITY_SCHEDULE;
     $tz       = new DateTimeZone($schedule['timezone']);
-    $now      = new DateTime('now', $tz);
-    $dayKey   = strtolower($now->format('D'));  // 'mon', 'tue', etc.
+    $dt       = new DateTime('now', $tz);
+    $dayKey   = strtolower($dt->format('D'));
     $hours    = $schedule['hours'][$dayKey] ?? null;
+    $current  = $dt->format('H:i');
+    $online   = $hours !== null && $current >= $hours[0] && $current < $hours[1];
 
-    if ($hours === null) return false;
-
-    [$open, $close] = $hours;
-    $current = $now->format('H:i');
-    return $current >= $open && $current < $close;
+    return [
+        'online' => $online,
+        'label'  => $online ? $l['available'] : ($schedule['offline_message'] ?? $l['offline_sched']),
+        'source' => 'schedule',
+    ];
 }
 
 // =============================================================================
@@ -683,6 +966,45 @@ function sanitizeUserInfo(array $info): array
         'email' => filter_var($info['email'] ?? '', FILTER_SANITIZE_EMAIL),
         'id'    => mb_substr(strip_tags((string)($info['id'] ?? '')), 0, 100),
     ];
+}
+
+/**
+ * Ensures an audio file is in OGG/Opus format for Telegram's native voice player.
+ * Returns [path, wasConverted]. If wasConverted=true, caller should unlink the temp file.
+ *
+ * - Already ogg  → returned as-is, no conversion needed.
+ * - webm/other   → converted via ffmpeg if available; falls back to original on failure.
+ */
+function convertToOggOpus(string $srcPath, string $mimeType): array
+{
+    // Already the right format
+    if (str_contains($mimeType, 'ogg')) {
+        return [$srcPath, false];
+    }
+
+    // Check ffmpeg availability
+    exec('ffmpeg -version 2>/dev/null', $out, $code);
+    if ($code !== 0) {
+        // ffmpeg not available — Telegram will still accept the file but
+        // may show it as an audio attachment rather than a voice message
+        return [$srcPath, false];
+    }
+
+    $oggPath = $srcPath . '_converted.ogg';
+    $cmd = sprintf(
+        'ffmpeg -y -i %s -c:a libopus -b:a 64k -vn %s 2>/dev/null',
+        escapeshellarg($srcPath),
+        escapeshellarg($oggPath)
+    );
+    exec($cmd, $output, $returnCode);
+
+    if ($returnCode === 0 && file_exists($oggPath) && filesize($oggPath) > 0) {
+        return [$oggPath, true];
+    }
+
+    // Conversion failed — use original
+    @unlink($oggPath);
+    return [$srcPath, false];
 }
 
 function generateUuid(): string

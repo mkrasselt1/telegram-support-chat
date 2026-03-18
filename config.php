@@ -33,6 +33,8 @@ const SESSION_TTL_SECONDS = 30 * 24 * 3600; // 30 days — sessions older than t
 // Set OFFLINE_NOTIFY_EMAIL to your sender address, or '' to disable.
 const OFFLINE_NOTIFY_EMAIL = '';        // e.g. 'support@yoursite.com'
 const OFFLINE_NOTIFY_AFTER = 5 * 60;   // 5 minutes away = considered offline
+const OFFLINE_NOTIFY_AFTER  = 5 * 60;   // 5 minutes away = considered offline
+const AGENT_ACTIVE_WINDOW   = 15 * 60;  // agent sent a message within this many seconds → show as online
 
 // --- Rate Limiting ---
 const RATE_LIMIT_PER_MINUTE = 60;
@@ -52,7 +54,7 @@ const AVAILABILITY_SCHEDULE = [
         'wed' => ['09:00', '18:00'],
         'thu' => ['09:00', '18:00'],
         'fri' => ['09:00', '17:00'],
-        'sat' => null,   // closed
+        'sat' => ['09:00', '17:00'],
         'sun' => null,   // closed
     ],
     'offline_message' => "We're currently offline. Leave a message and we'll get back to you as soon as possible!",
@@ -64,6 +66,11 @@ const WELCOME_MESSAGE = "Hello! 👋 How can we help you today?";
 // --- Company / Widget Branding ---
 const COMPANY_NAME   = 'Support Team';
 const COMPANY_AVATAR = '';  // URL to avatar image, or '' for initials
+
+// --- Language ---
+// Widget UI language. Built-in: 'en' (English), 'de' (German).
+// Also controls server-side messages (session closed notice, availability labels).
+const LANGUAGE = 'de';
 
 // --- Telegram bot self-filtering: fill in your bot's numeric user ID ---
 // (run getMe to find it: https://api.telegram.org/bot<TOKEN>/getMe)
