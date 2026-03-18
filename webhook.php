@@ -130,8 +130,10 @@ function processUpdate(array $update): void
     }
 
     $agentMsg = formatAgentMessage($msg);
+    debugLog('formatted message: ' . json_encode($agentMsg));
     $agentMsg = resolveAgentFile($agentMsg, $sessionId, $bot);
     appendToInbox($sessionId, $agentMsg);
+    debugLog('appendToInbox done for session ' . $sessionId);
     recordAgentActivity($agentName);
 }
 
@@ -261,8 +263,10 @@ function resolveAgentFile(array $msg, string $sessionId, TelegramBot $bot): arra
 
 function appendToInbox(string $sessionId, array $message): void
 {
-    if (!file_exists(SESSION_DIR . '/' . $sessionId . '.json')) return;
+    $path = SESSION_DIR . '/' . $sessionId . '.json';
+    if (!file_exists($path)) { debugLog('session file not found: ' . $path); return; }
     appendMessageToSession($sessionId, $message);
+    debugLog('message written to session file');
     maybeNotifyByEmail($sessionId, $message);
 }
 
