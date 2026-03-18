@@ -62,7 +62,7 @@ echo 'ok';
 // =============================================================================
 
 // Commands an agent can type in the Telegram thread to close the session
-const CLOSE_COMMANDS = ['/close', '/resolved', '/done', '/closed'];
+define('CLOSE_COMMANDS', ['/close', '/resolved', '/done', '/closed']);
 
 function debugLog(string $msg): void
 {
