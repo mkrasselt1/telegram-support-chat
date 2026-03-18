@@ -16,11 +16,10 @@ defined('TELEGRAM_ANNOUNCE_THREAD_ID')  || define('TELEGRAM_ANNOUNCE_THREAD_ID',
 defined('BOT_USER_ID')                  || define('BOT_USER_ID',                  0);
 
 // --- Storage Paths (must be writable by web server) ---
-// These use __DIR__ which is a runtime value, so define() is required here.
-define('DATA_DIR',    __DIR__ . '/data');
-define('SESSION_DIR', DATA_DIR . '/sessions');
-define('UPLOAD_DIR',  DATA_DIR . '/uploads');
-define('UPDATES_DIR', DATA_DIR . '/updates');
+defined('DATA_DIR')    || define('DATA_DIR',    __DIR__ . '/data');
+defined('SESSION_DIR') || define('SESSION_DIR', DATA_DIR . '/sessions');
+defined('UPLOAD_DIR')  || define('UPLOAD_DIR',  DATA_DIR . '/uploads');
+defined('UPDATES_DIR') || define('UPDATES_DIR', DATA_DIR . '/updates');
 
 // --- File Upload Limits ---
 defined('MAX_UPLOAD_BYTES')   || define('MAX_UPLOAD_BYTES',  10 * 1024 * 1024);

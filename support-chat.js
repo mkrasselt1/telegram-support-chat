@@ -444,7 +444,7 @@
       updateAvailability(data.availability, data.availability_label);
       setCompanyInfo(data.company_name, data.company_avatar);
 
-      // Render welcome message if fresh session
+      // Render welcome message if fresh session (no prior session or session changed)
       if (!stored || stored !== sessionId) {
         addSystemMessage(data.welcome_message || 'Hello! How can we help?');
       }
@@ -453,8 +453,6 @@
       if (data.history && data.history.length > 0) {
         for (const msg of data.history) renderMessage(msg, false);
         scrollToBottom(false);
-      } else if (!stored) {
-        addSystemMessage(data.welcome_message || 'Hello! How can we help?');
       }
 
       startPolling();
