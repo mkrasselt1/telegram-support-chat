@@ -166,7 +166,7 @@ class TelegramBot
     // Internal cURL request
     // -------------------------------------------------------------------------
 
-    private function request(string $method, array $params = [], array $files = []): array
+    private function request(string $method, array $params = [], array $files = []): mixed
     {
         $url = $this->baseUrl . $method;
         $ch  = curl_init($url);
