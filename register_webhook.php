@@ -11,8 +11,19 @@
 // =============================================================================
 require_once __DIR__ . '/config.php';
 
-$action = $argv[1] ?? ($_GET['action'] ?? 'info');
+$action = $argv[1] ?? ($_GET['action'] ?? null);
 $url    = $argv[2] ?? ($_GET['url']    ?? '');
+
+// No action given: auto-set if URL is configured, otherwise show info
+if ($action === null) {
+    $action = (TELEGRAM_WEBHOOK_URL !== '') ? 'set' : 'info';
+    if ($action === 'set') {
+        $url = TELEGRAM_WEBHOOK_URL;
+        if ($secret === '') {
+            echo "⚠️  Warning: TELEGRAM_WEBHOOK_SECRET is empty — webhook accepts requests from anyone!\n";
+        }
+    }
+}
 $token  = TELEGRAM_BOT_TOKEN;
 $secret = TELEGRAM_WEBHOOK_SECRET;
 
