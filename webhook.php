@@ -46,11 +46,7 @@ foreach ([DATA_DIR, SESSION_DIR, UPLOAD_DIR, UPDATES_DIR] as $dir) {
 }
 
 // --- Process the update ---
-try {
-    processUpdate($update);
-} catch (Throwable $e) {
-    debugLog('FATAL: ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());
-}
+processUpdate($update);
 
 // Respond 200 after processing — Telegram retries on non-2xx
 http_response_code(200);
@@ -61,32 +57,21 @@ echo 'ok';
 // Processing
 // =============================================================================
 
-// Commands an agent can type in the Telegram thread to close the session
-
-function debugLog(string $msg): void
-{
-    $logFile = DATA_DIR . '/webhook_debug.log';
-    $line    = '[' . date('Y-m-d H:i:s') . '] ' . $msg . "\n";
-    file_put_contents($logFile, $line, FILE_APPEND | LOCK_EX);
-}
-
 function processUpdate(array $update): void
 {
     $isEdit = isset($update['edited_message']) && !isset($update['message']);
     $msg    = $update['message'] ?? $update['edited_message'] ?? null;
-    if (!$msg) { debugLog('no message in update: ' . json_encode($update)); return; }
+    if (!$msg) return;
 
     // Ignore bots
-    if ($msg['from']['is_bot'] ?? false) { debugLog('ignored bot message'); return; }
-    if (BOT_USER_ID !== 0 && (int)($msg['from']['id'] ?? 0) === BOT_USER_ID) { debugLog('ignored own bot message'); return; }
+    if ($msg['from']['is_bot'] ?? false) return;
+    if (BOT_USER_ID !== 0 && (int)($msg['from']['id'] ?? 0) === BOT_USER_ID) return;
 
     $threadId  = $msg['message_thread_id'] ?? null;
     $agentName = trim(($msg['from']['first_name'] ?? '') . ' ' . ($msg['from']['last_name'] ?? '')) ?: COMPANY_NAME;
     $text      = trim($msg['text'] ?? '');
     $command   = strtolower(preg_replace('/@\S+$/', '', $text));
     $bot       = new TelegramBot(TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID);
-
-    debugLog("update received — thread={$threadId} from={$agentName} text={$text}");
 
     // /online and /offline are group-wide — work even in the General topic
     // where message_thread_id is absent.
@@ -104,15 +89,8 @@ function processUpdate(array $update): void
     if ($threadId === null) return;  // all other commands require a thread
 
     $sessionId = lookupSession((int) $threadId);
-    debugLog("lookupSession({$threadId}) → " . ($sessionId ?? 'null'));
     if (!$sessionId) return;  // update is for a thread we don't manage
 
-    $sessionFile = SESSION_DIR . '/' . $sessionId . '.json';
-    debugLog('session file exists: ' . (file_exists($sessionFile) ? 'yes' : 'NO')
-        . ' | writable: ' . (is_writable($sessionFile) ? 'yes' : 'NO')
-        . ' | dir writable: ' . (is_writable(SESSION_DIR) ? 'yes' : 'NO'));
-
-    debugLog('checking close command: ' . $command);
     if (in_array($command, ['/close', '/resolved', '/done', '/closed'], true)) {
         closeSession($sessionId, 'agent', $bot);
         return;
@@ -131,10 +109,8 @@ function processUpdate(array $update): void
     }
 
     $agentMsg = formatAgentMessage($msg);
-    debugLog('formatted message: ' . json_encode($agentMsg));
     $agentMsg = resolveAgentFile($agentMsg, $sessionId, $bot);
     appendToInbox($sessionId, $agentMsg);
-    debugLog('appendToInbox done for session ' . $sessionId);
     recordAgentActivity($agentName);
 }
 
@@ -264,10 +240,8 @@ function resolveAgentFile(array $msg, string $sessionId, TelegramBot $bot): arra
 
 function appendToInbox(string $sessionId, array $message): void
 {
-    $path = SESSION_DIR . '/' . $sessionId . '.json';
-    if (!file_exists($path)) { debugLog('session file not found: ' . $path); return; }
+    if (!file_exists(SESSION_DIR . '/' . $sessionId . '.json')) return;
     appendMessageToSession($sessionId, $message);
-    debugLog('message written to session file');
     maybeNotifyByEmail($sessionId, $message);
 }
 
