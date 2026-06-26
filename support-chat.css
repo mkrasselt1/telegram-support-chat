@@ -770,3 +770,48 @@
     display: flex;
   }
 }
+
+/* =============================================================================
+   Dark Mode — folgt automatisch der System-/Browser-Einstellung
+   (prefers-color-scheme: dark).
+
+   Setzt nur die Flaechen-/Text-/Rahmen-Variablen um; das Marken-Blau
+   (--sc-primary / -dark, per JS aus der Theme-Config gesetzt) bleibt erhalten.
+   Header, Launcher und Buttons sind damit weiter blau, der Rest wird dunkel.
+   ============================================================================= */
+@media (prefers-color-scheme: dark) {
+  #support-chat-root {
+    --sc-text:          #e6e8ec;
+    --sc-text-muted:    #9aa0a8;
+    --sc-bg:            #1e2125;
+    --sc-bg-secondary:  #24282d;
+    --sc-border:        #33373d;
+    --sc-shadow:        0 10px 34px rgba(0,0,0,.55);
+    --sc-bubble-agent:  #2a2e34;
+    /* --sc-primary-light wird per JS inline gesetzt (heller Blau-Tint) und
+       dient nur als Flaechen-Hintergrund -> mit !important auf dunklen Tint
+       zwingen, damit Datei-Icon, Anhang-Vorschau und Emoji-Tabs nicht hell sind. */
+    --sc-primary-light: rgba(0, 136, 204, .18) !important;
+  }
+
+  /* Eingabefelder hatten beim Fokus hart background:#fff */
+  #support-chat-root #sc-text-input:focus,
+  #support-chat-root #sc-transcript-email:focus {
+    background: var(--sc-bg);
+  }
+
+  /* "Entfernen"-Kreis der Datei-Vorschau war auf dunklem Grund unsichtbar */
+  #support-chat-root #sc-preview-remove {
+    background: rgba(255, 255, 255, .15);
+  }
+
+  /* Helle Pastell-Banner abdunkeln, Farbgebung (Warnung/Aufnahme) erhalten */
+  #support-chat-root #sc-offline-banner {
+    background: rgba(245, 158, 11, .15);
+    color: #fcd34d;
+  }
+  #support-chat-root #sc-record-bar {
+    background: rgba(239, 68, 68, .12);
+    border-top-color: rgba(239, 68, 68, .40);
+  }
+}
