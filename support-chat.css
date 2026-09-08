@@ -254,7 +254,7 @@
   flex-shrink: 0;
   align-self: flex-end;
 }
-.sc-bubble {
+#support-chat-root .sc-bubble {
   max-width: 80%;
   min-width: 0;
   padding: 8px 12px;

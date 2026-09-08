@@ -227,7 +227,7 @@
       const link = document.createElement('link');
       link.rel  = 'stylesheet';
       const separator = cssPath.includes('?') ? '&' : '?';
-      link.href = cssPath + separator + 'v=20260908-2';
+      link.href = cssPath + separator + 'v=20260908-3';
       document.head.appendChild(link);
     }
   }
