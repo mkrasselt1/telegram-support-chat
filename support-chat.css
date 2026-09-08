@@ -256,9 +256,10 @@
 }
 .sc-bubble {
   max-width: 80%;
-  padding: 9px 14px;
+  min-width: 0;
+  padding: 8px 12px;
   border-radius: 16px;
-  word-break: break-word;
+  overflow-wrap: anywhere;
   font-size: 14px;
   line-height: 1.45;
   position: relative;
