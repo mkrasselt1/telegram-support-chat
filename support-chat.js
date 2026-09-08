@@ -28,6 +28,7 @@
       statusOnline:          'Online — we reply quickly',
       statusOffline:         'Currently offline',
       placeholder:           'Type a message…',
+      startHint:             'Write a message first to start the chat.',
       launcherAriaLabel:     'Open support chat',
       launcherTitle:         'Chat with us',
       windowAriaLabel:       'Support Chat',
@@ -87,6 +88,7 @@
       statusOnline:          'Online — wir antworten schnell',
       statusOffline:         'Zurzeit offline',
       placeholder:           'Nachricht schreiben…',
+      startHint:             'Schreib zuerst eine Nachricht, um den Chat zu starten.',
       launcherAriaLabel:     'Support-Chat öffnen',
       launcherTitle:         'Mit uns chatten',
       windowAriaLabel:       'Support-Chat',
@@ -167,6 +169,7 @@
   let pendingFile   = null;   // { file, dataUrl, type }
   let emojiOpen     = false;
   let initialized  = false;
+  let sessionInitPromise = null;
   const pageUrl    = location.href;
 
   // --------------------------------------------------------------------------
@@ -408,10 +411,10 @@
     $('sc-window').classList.add('sc-open');
     clearUnread();
 
-    if (!sessionId) {
-      initSession();
-    } else {
+    if (sessionId) {
       startPolling();
+    } else if (localStorage.getItem('sc_session_id')) {
+      ensureSession();
     }
     // Restore unsent draft
     const draft = localStorage.getItem('sc_draft');
@@ -420,6 +423,9 @@
       input.value = draft;
       autoGrowTextarea(input);
       $('sc-send-btn').disabled = false;
+    }
+    if (!sessionId && !localStorage.getItem('sc_session_id') && !input.value.trim()) {
+      showStartHint();
     }
     input.focus();
   }
@@ -476,7 +482,7 @@
   }
 
   function restartChat() {
-    // Clear session — next openChat() creates a fresh one
+    // Clear session — the next non-empty input creates a fresh one
     localStorage.removeItem('sc_session_id');
     sessionId  = null;
     lastMsgId  = null;
@@ -484,12 +490,22 @@
     $('sc-resolved-overlay').classList.remove('sc-visible');
     $('sc-input-area').style.display  = '';
     $('sc-resolve-btn').style.display = '';
-    initSession();
+    $('sc-text-input').focus();
   }
 
   // --------------------------------------------------------------------------
   // Session init
   // --------------------------------------------------------------------------
+  function ensureSession() {
+    if (sessionId) return Promise.resolve();
+    if (!sessionInitPromise) {
+      sessionInitPromise = initSession().finally(() => {
+        sessionInitPromise = null;
+      });
+    }
+    return sessionInitPromise;
+  }
+
   async function initSession() {
     const stored = localStorage.getItem('sc_session_id');
     const body   = {
@@ -615,6 +631,14 @@
     const input = $('sc-text-input');
     const text  = input.value.trim();
     if (!text && !pendingFile) return;
+    if (!sessionId) {
+      try {
+        await ensureSession();
+      } catch {
+        showBanner(t('errConnect'));
+        return;
+      }
+    }
     if (!sessionId) return;
 
     if (pendingFile) {
@@ -934,6 +958,10 @@
     const input = $('sc-text-input');
     autoGrowTextarea(input);
     $('sc-send-btn').disabled = !input.value.trim() && !pendingFile;
+    if (input.value.trim()) {
+      removeStartHint();
+      if (!sessionId) ensureSession();
+    }
     // Persist draft across page navigations
     if (input.value.trim()) {
       localStorage.setItem('sc_draft', input.value);
@@ -1179,6 +1207,17 @@
     el.textContent = text;
     $('sc-messages').appendChild(el);
     scrollToBottom(false);
+  }
+
+  function showStartHint() {
+    if ($('sc-messages').querySelector('.sc-start-hint')) return;
+    addSystemMessage(t('startHint'));
+    $('sc-messages').lastElementChild.classList.add('sc-start-hint');
+  }
+
+  function removeStartHint() {
+    const hint = $('sc-messages').querySelector('.sc-start-hint');
+    if (hint) hint.remove();
   }
 
   // --------------------------------------------------------------------------
