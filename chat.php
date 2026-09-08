@@ -101,8 +101,11 @@ function actionSend(): void
             $text = mb_substr($text, 0, 4096);
             $message['content'] = $text;
 
-            $userName = $session['user_info']['name'] ?? 'User';
-            $formatted = "<b>{$userName}:</b>\n" . htmlspecialchars($text, ENT_QUOTES | ENT_HTML5);
+            $userName = trim($session['user_info']['name'] ?? '');
+            $formatted = htmlspecialchars($text, ENT_QUOTES | ENT_HTML5);
+            if ($userName !== '') {
+                $formatted = '<b>' . htmlspecialchars($userName, ENT_QUOTES | ENT_HTML5) . ":</b>\n" . $formatted;
+            }
             $bot->sendMessage($formatted, $threadId);
             break;
 
@@ -299,8 +302,10 @@ function actionUpload(): void
     $bot      = makeTelegramBot();
     $session  = loadSession($sessionId);
     $threadId = (int) $session['thread_id'];
-    $userName = $session['user_info']['name'] ?? 'User';
-    $caption  = "<b>{$userName}</b> sent a file";
+    $userName = trim($session['user_info']['name'] ?? '');
+    $caption  = $userName !== ''
+        ? '<b>' . htmlspecialchars($userName, ENT_QUOTES | ENT_HTML5) . '</b> sent a file'
+        : 'File sent';
 
     // Send to Telegram based on type
     if (str_starts_with($mimeType, 'image/')) {
